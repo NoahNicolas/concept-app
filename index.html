@@ -262,10 +262,10 @@ hr{border:none;border-top:0.5px solid var(--border);margin:1rem 0;}
 
 <script>
 const INTERVALS=[1,4,10,21,30,90,180];
-const BASE_TAGS=['mse','coaching','management','changement'];
-const TAG_BG={mse:'#EEEDFE',coaching:'#E1F5EE',management:'#FAEEDA',changement:'#FAECE7'};
-const TAG_COLOR={mse:'#3C3489',coaching:'#085041',management:'#633806',changement:'#4A1B0C'};
-const TAG_BORDER={mse:'#AFA9EC',coaching:'#5DCAA5',management:'#EF9F27',changement:'#F0997B'};
+const BASE_TAGS=['mse','coaching','management','changement','neuroscience'];
+const TAG_BG={mse:'#EEEDFE',coaching:'#E1F5EE',management:'#FAEEDA',changement:'#FAECE7',neuroscience:'#E6F1FB'};
+const TAG_COLOR={mse:'#3C3489',coaching:'#085041',management:'#633806',changement:'#4A1B0C',neuroscience:'#042C53'};
+const TAG_BORDER={mse:'#AFA9EC',coaching:'#5DCAA5',management:'#EF9F27',changement:'#F0997B',neuroscience:'#378ADD'};
 
 let currentFilter='all',currentId=null,editingId=null;
 let reviewQueue=[],reviewStep=0,reviewRecall='';
@@ -347,10 +347,10 @@ function addTagInput(){
 }
 
 function commitNewTag(val){
-  const tag=val.trim().toLowerCase().replace(/\s+/g,'-');
+  const tag=val.trim().toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9À-ž-]/g,'');
   if(!tag||tag.length<2)return;
   const custom=loadCustomTags();
-  if(!getAllTags().includes(tag)){custom.push(tag);saveCustomTags(custom);}
+  if(!getAllTags().map(t=>t.toLowerCase()).includes(tag)){custom.push(tag);saveCustomTags(custom);}
   selectedTags.add(tag);renderTagSelector();renderFilterChips();
 }
 
@@ -489,7 +489,10 @@ Réponds UNIQUEMENT en JSON valide sans markdown :
   }
 }
 
+let _currentInspConcept=null;
+
 function renderInspCard(c,theme){
+  _currentInspConcept=c;
   const el=document.getElementById('insp-section');if(!el)return;
   el.innerHTML=`<div class="insp-card">
     <div style="font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:#7F77DD;margin-bottom:8px;">Inspiration du jour — ${theme}</div>
@@ -498,24 +501,13 @@ function renderInspCard(c,theme){
     ${c.application?`<div style="font-size:14px;line-height:1.6;color:#3C3489;font-style:italic;margin-bottom:10px;">${c.application}</div>`:''}
     ${c.source?`<div style="font-size:12px;color:#7F77DD;margin-bottom:12px;">Source : ${c.source}</div>`:''}
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <button class="btn-xs-p" onclick="addInspiration(${JSON.stringify(JSON.stringify(c))})">+ Ajouter à ma base</button>
-      <button class="btn-xs" onclick="refreshInspiration()">Autre concept</button>
+      <button class="btn-xs-p" id="add-insp-btn">+ Ajouter à ma base</button>
+      <button class="btn-xs" id="refresh-insp-btn">Autre concept</button>
     </div>
   </div>`;
 }
 
-function addInspiration(jsonStr){
-  const c=JSON.parse(jsonStr);
-  const data=loadData();
-  if(data.find(x=>x.title.toLowerCase()===c.title.toLowerCase())){alert('Ce concept est déjà dans ta base.');return;}
-  data.push({id:Date.now().toString(),title:c.title,definition:c.definition,
-    application:c.application||'',source:c.source||'',tags:[],image:'',
-    level:0,nextReview:null,lastReview:null,createdAt:now()});
-  saveData(data);updateBadge();
-  localStorage.removeItem('insp_cache_date');
-  alert(`"${c.title}" ajouté à ta bibliothèque !`);
-  renderDashboard();
-}
+
 
 function refreshInspiration(){
   localStorage.removeItem('insp_cache_date');
@@ -627,6 +619,7 @@ document.getElementById('add-btn').addEventListener('click',function(){
     }
     editingId=null;
   }else{
+    if(data.find(c=>c.title.toLowerCase()===title.toLowerCase())){alert('Un concept avec ce nom existe déjà.');return;}
     data.push({id:Date.now().toString(),title,definition,
       application:document.getElementById('f-application').value.trim(),
       source:document.getElementById('f-source').value.trim(),
@@ -676,6 +669,21 @@ document.addEventListener('click',function(e){
     if(!confirm('Supprimer TOUS les concepts ? Irréversible.'))return;
     localStorage.removeItem('cv5');
     updateBadge();showView('dashboard');
+  }
+  if(e.target.id==='add-insp-btn'){
+    if(!_currentInspConcept){alert('Concept non disponible.');return;}
+    const c=_currentInspConcept;
+    const data=loadData();
+    if(data.find(x=>x.title.toLowerCase()===c.title.toLowerCase())){alert('Ce concept est déjà dans ta base.');return;}
+    data.push({id:Date.now().toString(),title:c.title,definition:c.definition,
+      application:c.application||'',source:c.source||'',tags:[],image:'',
+      level:0,nextReview:null,lastReview:null,createdAt:now()});
+    saveData(data);updateBadge();
+    alert('"'+c.title+'" ajouté à ta bibliothèque !');
+    renderDashboard();
+  }
+  if(e.target.id==='refresh-insp-btn'){
+    refreshInspiration();
   }
 });
 
@@ -749,7 +757,7 @@ function parseMdContent(content,filename){
   const tagLine=lines.find(l=>l.includes('Tags')&&l.includes('#'));
   if(tagLine){
     const found=(tagLine.match(/#[\w\u00C0-\u017E]+/g)||[]).map(t=>t.replace('#','').toLowerCase());
-    getAllTags().forEach(cat=>{if(found.includes(cat))tags.push(cat);});
+    getAllTags().forEach(cat=>{if(found.includes(cat.toLowerCase()))tags.push(cat);});
   }
 
   let sec='';
@@ -934,7 +942,10 @@ document.addEventListener('click',function(e){
     const toImport=importQueue.filter(r=>r.status==='ok'||r.status==='fixed');
     if(!toImport.length)return;
     const data=loadData();
+    const existingTitlesSet=new Set(data.map(c=>c.title.toLowerCase()));
     toImport.forEach(r=>{
+      if(existingTitlesSet.has(r.title.toLowerCase()))return;
+      existingTitlesSet.add(r.title.toLowerCase());
       data.push({id:Date.now().toString()+Math.random(),title:r.title,definition:r.definition,
         application:r.application||'',source:r.source||'',tags:r.tags||[],image:'',
         level:0,nextReview:null,lastReview:null,createdAt:now()});
