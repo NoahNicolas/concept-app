@@ -202,8 +202,9 @@ const SB_URL='https://ttrykkwujinhocjztfcc.supabase.co';
 const SB_KEY='sb_publishable_7pbL7F6Uj28BA9Hv8fSjLQ_iysY6x22';
 
 async function sb(path,opts={}){
-  const res=await fetch(SB_URL+'/rest/v1/'+path,{...opts,headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json',...(opts.headers||{})}});
-  if(!res.ok)throw new Error(await res.text());
+  const headers={'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json',...(opts.headers||{})};
+  const res=await fetch(SB_URL+'/rest/v1/'+path,{...opts,headers});
+  if(!res.ok){const err=await res.text();console.error('Supabase error:',res.status,err);throw new Error(res.status+' '+err);}
   const t=await res.text();return t?JSON.parse(t):null;
 }
 function rowToC(r){return{id:r.id,title:r.title,definition:r.definition,application:r.application||'',source:r.source||'',tags:r.tags||[],image:r.image||'',level:r.level||0,nextReview:r.next_review||null,lastReview:r.last_review||null,createdAt:r.created_at||now()};}
@@ -213,7 +214,7 @@ let _concepts=null,_customTags=null;
 async function getConcepts(){if(_concepts)return _concepts;const rows=await sb('concepts?select=*&order=created_at.asc');_concepts=(rows||[]).map(rowToC);return _concepts;}
 async function getCustomTags(){if(_customTags)return _customTags;const rows=await sb('custom_tags?select=tag&order=id.asc');_customTags=(rows||[]).map(r=>r.tag);return _customTags;}
 function getAllTags(){return[...BASE_TAGS,...(_customTags||[])];}
-async function addConceptDB(c){await sb('concepts',{method:'POST',headers:{'Prefer':'resolution=merge-duplicates'},body:JSON.stringify(cToRow(c))});if(_concepts)_concepts.push(c);}
+async function addConceptDB(c){await sb('concepts',{method:'POST',headers:{'Content-Type':'application/json','Prefer':'return=minimal,resolution=merge-duplicates'},body:JSON.stringify(cToRow(c))});if(_concepts)_concepts.push(c);}
 async function updateConceptDB(c){await sb('concepts?id=eq.'+c.id,{method:'PATCH',body:JSON.stringify(cToRow(c))});if(_concepts){const i=_concepts.findIndex(x=>x.id===c.id);if(i>=0)_concepts[i]=c;}}
 async function deleteConceptDB(id){await sb('concepts?id=eq.'+id,{method:'DELETE'});if(_concepts)_concepts=_concepts.filter(c=>c.id!==id);}
 async function addCustomTagDB(tag){await sb('custom_tags',{method:'POST',headers:{'Prefer':'resolution=ignore-duplicates'},body:JSON.stringify({tag})});if(_customTags&&!_customTags.includes(tag))_customTags.push(tag);}
@@ -544,14 +545,36 @@ function toggleMiniTag(i,tag){const r=importQueue[i];if(!r.miniTags)r.miniTags=n
 function saveMiniForm(i){const d=document.getElementById(`mf_def_${i}`),a=document.getElementById(`mf_app_${i}`),s=document.getElementById(`mf_src_${i}`);const def=(d?d.value:'').trim();if(!def){alert('La définition est requise.');return;}importQueue[i].definition=def;importQueue[i].application=a?a.value.trim():'';importQueue[i].source=s?s.value.trim():'';importQueue[i].tags=importQueue[i].miniTags?[...importQueue[i].miniTags]:[];importQueue[i].status='fixed';importQueue[i].miniOpen=false;renderImportPreview();}
 
 document.getElementById('confirm-import-btn').addEventListener('click',async function(){
-  const toImport=importQueue.filter(r=>r.status==='ok'||r.status==='fixed');if(!toImport.length)return;
+  const toImport=importQueue.filter(r=>r.status==='ok'||r.status==='fixed');
+  if(!toImport.length){alert('Aucun concept à importer.');return;}
   showLoading('Import en cours...');
   try{
-    const existing=await getConcepts();const existingTitles=new Set(existing.map(c=>c.title.toLowerCase()));let added=0;
-    for(const r of toImport){if(existingTitles.has(r.title.toLowerCase()))continue;existingTitles.add(r.title.toLowerCase());const newC={id:Date.now().toString()+Math.random(),title:r.title,definition:r.definition,application:r.application||'',source:r.source||'',tags:r.tags||[],image:'',level:0,nextReview:null,lastReview:null,createdAt:now()};await addConceptDB(newC);added++;}
-    await updateBadge();resetImport();await showView('library');
-    setTimeout(()=>alert(`${added} concept${added>1?'s':''} importé${added>1?'s':''} avec succès.`),100);
-  }finally{hideLoading();}
+    const existing=await getConcepts();
+    const existingTitles=new Set(existing.map(c=>c.title.toLowerCase()));
+    let added=0;
+    for(const r of toImport){
+      if(existingTitles.has(r.title.toLowerCase()))continue;
+      existingTitles.add(r.title.toLowerCase());
+      const newC={
+        id:Date.now().toString()+Math.random(),
+        title:r.title,definition:r.definition,
+        application:r.application||'',source:r.source||'',
+        tags:r.tags||[],image:'',level:0,
+        nextReview:null,lastReview:null,createdAt:now()
+      };
+      await addConceptDB(newC);
+      added++;
+    }
+    _concepts=null; // force cache refresh
+    await updateBadge();
+    resetImport();
+    await showView('library');
+    setTimeout(()=>alert(added+' concept'+(added>1?'s':'')+' importé'+(added>1?'s':'')+' avec succès.'),100);
+  }catch(err){
+    alert('Erreur import : '+err.message);
+  }finally{
+    hideLoading();
+  }
 });
 document.getElementById('reset-import-btn').addEventListener('click',resetImport);
 
