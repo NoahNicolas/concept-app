@@ -637,31 +637,34 @@ async function nextConcept(){
 }
 async function genQuestions(concept){
   const area=document.getElementById('q-area');const key=getGeminiKey();
-  if(!key){if(area)area.innerHTML='<p style="color:var(--danger);font-size:14px;">Configure ta clé Gemini dans Réglages.</p>';return;}
+  if(!key){if(area)area.innerHTML='<p style="color:var(--danger);font-size:14px;">Configure ta cl\u00e9 Gemini dans R\u00e9glages.</p>';return;}
   try{
-    const text=await callGemini(`Tu es un assistant pédagogique. Génère 3 questions de compréhension sur ce concept pour aider un étudiant à l'ancrer en mémoire. Va au-delà de la définition : liens avec d'autres concepts, applications, nuances.\n\nConcept : ${concept.title}\nDéfinition : ${concept.definition}\n${concept.application?'Application : '+concept.application:''}\n\nRéponds UNIQUEMENT en JSON valide sans markdown :\n{"questions":["q1","q2","q3"]}`);
-    const parsed=JSON.parse(text.replace(/```json|```/g,'').trim());if(!area)return;
-    area.innerHTML=parsed.questions.map((q,i)=>`<div style="margin-bottom:1.25rem;"><p style="font-size:12px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.06em;">Question ${i+1}</p><p style="font-size:15px;line-height:1.7;">${q}</p><textarea class="field" style="margin-top:8px;min-height:60px;" placeholder="Ta réponse..."></textarea></div>${i<2?'<hr/>':''}`).join('');
-  }catch(e){if(area)area.innerHTML=`<p style="color:var(--danger);font-size:14px;">Erreur : ${e.message}</p>`;}
+    const prompt='Tu es un assistant p\u00e9dagogique. G\u00e9n\u00e8re 3 questions de compr\u00e9hension sur ce concept pour aider un \u00e9tudiant \u00e0 l\'ancrer en m\u00e9moire. Va au-del\u00e0 de la d\u00e9finition : liens avec d\'autres concepts, applications, nuances.\n\nConcept : '+concept.title+'\nD\u00e9finition : '+concept.definition+'\n'+(concept.application?'Application : '+concept.application:'')+'\n\nPour chaque question, fournis une r\u00e9ponse de r\u00e9f\u00e9rence concise (2-3 phrases).\n\nR\u00e9ponds UNIQUEMENT en JSON valide sans markdown :\n{"items":[{"question":"q1","answer":"r\u00e9ponse 1"},{"question":"q2","answer":"r\u00e9ponse 2"},{"question":"q3","answer":"r\u00e9ponse 3"}]}';
+    const text=await callGemini(prompt);
+    const parsed=JSON.parse(text.replace(/```json|```/g,'').trim());
+    if(!area)return;
+    const items=parsed.items||[];
+    area.innerHTML=items.map((item,i)=>
+      '<div style="margin-bottom:1.25rem;">'
+      +'<p style="font-size:12px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.06em;">Question '+(i+1)+'</p>'
+      +'<p style="font-size:15px;line-height:1.7;margin-bottom:8px;">'+item.question+'</p>'
+      +'<textarea class="field qa-input" data-idx="'+i+'" style="min-height:60px;" placeholder="Ta r\u00e9ponse..."></textarea>'
+      +'</div>'+(i<2?'<hr/>':'')
+    ).join('')
+    +'<button class="btn-p" style="width:100%;margin-top:1rem;" id="reveal-answers-btn">Voir les r\u00e9ponses de r\u00e9f\u00e9rence</button>'
+    +'<div id="answers-reveal" style="display:none;margin-top:1rem;"></div>';
+    window._qaItems=items;
+    document.getElementById('reveal-answers-btn').addEventListener('click',function(){
+      const html='<p style="font-size:13px;font-weight:500;color:var(--text2);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.06em;">R\u00e9ponses de r\u00e9f\u00e9rence</p>'
+        +(window._qaItems||[]).map((item,i)=>
+          '<div style="margin-bottom:1rem;">'
+          +'<p style="font-size:12px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.06em;">Question '+(i+1)+'</p>'
+          +'<div style="background:#E6F1FB;border-left:3px solid #378ADD;border-radius:var(--radius);padding:10px 14px;font-size:14px;line-height:1.7;color:#042C53;">'+item.answer+'</div>'
+          +'</div>'
+        ).join('');
+      document.getElementById('answers-reveal').innerHTML=html;
+      document.getElementById('answers-reveal').style.display='block';
+      this.style.display='none';
+    });
+  }catch(e){if(area)area.innerHTML='<p style="color:var(--danger);font-size:14px;">Erreur : '+e.message+'</p>';}
 }
-
-document.addEventListener('click',async function(e){
-  if(e.target.id==='add-insp-btn'){
-    if(!_currentInspConcept)return;const c=_currentInspConcept;const data=await getConcepts();
-    if(data.find(x=>x.title.toLowerCase()===c.title.toLowerCase())){alert('Ce concept est déjà dans ta base.');return;}
-    const newC={id:crypto.randomUUID(),title:c.title,definition:c.definition,application:c.application||'',source:c.source||'',tags:[],image:'',level:0,nextReview:null,lastReview:null,createdAt:now()};
-    showLoading('Ajout...');try{await addConceptDB(newC);}finally{hideLoading();}
-    await updateBadge();alert('"'+c.title+'" ajouté !');await renderDashboard();
-  }
-  if(e.target.id==='refresh-insp-btn'){localStorage.removeItem('insp_cache');localStorage.removeItem('insp_cache_date');await renderInspiration();}
-  if(e.target.classList.contains('theme-chip'))await selectTheme(e.target.textContent);
-});
-
-(async function init(){
-  showLoading('Chargement...');
-  try{await getCustomTags();await getConcepts();}finally{hideLoading();}
-  await updateBadge();await renderDashboard();
-})();
-</script>
-</body>
-</html>
