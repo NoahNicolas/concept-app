@@ -266,6 +266,124 @@ hr{border:none;border-top:0.5px solid var(--border);margin:1rem 0;}
 </div>
 
 <script>
+// SUPABASE CONFIG
+const SB_URL='https://ttrykkwujinhocjztfcc.supabase.co';
+const SB_KEY='sb_publishable_7pbL7F6Uj28BA9Hv8fSjLQ_iysY6x22';
+
+async function sbFetch(path, options={}){
+  const res=await fetch(SB_URL+'/rest/v1/'+path,{
+    ...options,
+    headers:{
+      'apikey':SB_KEY,
+      'Authorization':'Bearer '+SB_KEY,
+      'Content-Type':'application/json',
+      'Prefer': options.prefer||'',
+      ...(options.headers||{})
+    }
+  });
+  if(!res.ok){const e=await res.text();throw new Error(e);}
+  const text=await res.text();
+  return text?JSON.parse(text):null;
+}
+
+// Convert DB row -> app concept
+function dbToApp(row){
+  return{
+    id:row.id,title:row.title,definition:row.definition,
+    application:row.application||'',source:row.source||'',
+    tags:row.tags||[],image:row.image||'',
+    level:row.level||0,nextReview:row.next_review||null,
+    lastReview:row.last_review||null,createdAt:row.created_at||now()
+  };
+}
+
+// Convert app concept -> DB row
+function appToDb(c){
+  return{
+    id:c.id,title:c.title,definition:c.definition,
+    application:c.application||'',source:c.source||'',
+    tags:c.tags||[],image:c.image||'',
+    level:c.level||0,next_review:c.nextReview||null,
+    last_review:c.lastReview||null,created_at:c.createdAt||now()
+  };
+}
+
+// SUPABASE DATA FUNCTIONS
+async function loadDataRemote(){
+  try{
+    const rows=await sbFetch('concepts?select=*&order=created_at.asc');
+    return(rows||[]).map(dbToApp);
+  }catch(e){console.error('loadDataRemote',e);return loadDataLocal();}
+}
+
+async function saveConceptRemote(c){
+  await sbFetch('concepts',{
+    method:'POST',
+    prefer:'resolution=merge-duplicates',
+    headers:{'Prefer':'resolution=merge-duplicates'},
+    body:JSON.stringify(appToDb(c))
+  });
+}
+
+async function updateConceptRemote(c){
+  await sbFetch('concepts?id=eq.'+c.id,{
+    method:'PATCH',
+    body:JSON.stringify(appToDb(c))
+  });
+}
+
+async function deleteConceptRemote(id){
+  await sbFetch('concepts?id=eq.'+id,{method:'DELETE'});
+}
+
+async function loadCustomTagsRemote(){
+  try{
+    const rows=await sbFetch('custom_tags?select=tag&order=id.asc');
+    return(rows||[]).map(r=>r.tag);
+  }catch(e){return loadCustomTagsLocal();}
+}
+
+async function saveCustomTagRemote(tag){
+  await sbFetch('custom_tags',{
+    method:'POST',
+    headers:{'Prefer':'resolution=ignore-duplicates'},
+    body:JSON.stringify({tag})
+  });
+}
+
+async function deleteCustomTagRemote(tag){
+  await sbFetch('custom_tags?tag=eq.'+encodeURIComponent(tag),{method:'DELETE'});
+}
+
+// LOCAL FALLBACKS
+function loadDataLocal(){try{return JSON.parse(localStorage.getItem('cv5')||'[]');}catch{return[];}}
+function loadCustomTagsLocal(){try{return JSON.parse(localStorage.getItem('cv5_tags')||'[]');}catch{return[];}}
+
+// CACHE (for sync speed)
+let _conceptsCache=null;
+let _tagsCache=null;
+
+async function loadData(){
+  if(_conceptsCache)return _conceptsCache;
+  _conceptsCache=await loadDataRemote();
+  return _conceptsCache;
+}
+
+async function saveData(concepts){
+  _conceptsCache=concepts;
+}
+
+async function loadCustomTags(){
+  if(_tagsCache)return _tagsCache;
+  _tagsCache=await loadCustomTagsRemote();
+  return _tagsCache;
+}
+
+function getAllTags(){
+  const custom=_tagsCache||[];
+  return[...BASE_TAGS,...custom];
+}
+
 const INTERVALS=[1,4,10,21,30,90,180];
 const BASE_TAGS=['mse','coaching','management','changement','neuroscience'];
 const TAG_BG={mse:'#EEEDFE',coaching:'#E1F5EE',management:'#FAEEDA',changement:'#FAECE7',neuroscience:'#E6F1FB'};
@@ -285,7 +403,7 @@ function getAllTags(){return[...BASE_TAGS,...loadCustomTags()];}
 function now(){return new Date().toISOString().split('T')[0];}
 function addDays(date,n){const d=new Date(date);d.setDate(d.getDate()+n);return d.toISOString().split('T')[0];}
 function isDue(c){return!c.nextReview||c.nextReview<=now();}
-function getDue(){return loadData().filter(isDue);}
+async function getDue(){return(await loadData()).filter(isDue);}
 function getGeminiKey(){return localStorage.getItem('gemini_key')||'';}
 function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
 
@@ -309,8 +427,9 @@ function cleanMd(text){
     .trim();
 }
 
-function updateBadge(){
-  const n=getDue().length,b=document.getElementById('due-badge');
+async function updateBadge(){
+  const due=await getDue();
+  const n=due.length,b=document.getElementById('due-badge');
   b.style.display=n>0?'inline-flex':'none';b.textContent=n;
 }
 
@@ -355,23 +474,24 @@ function commitNewTag(val){
   const tag=val.trim().toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9À-ž-]/g,'');
   if(!tag||tag.length<2)return;
   const custom=loadCustomTags();
-  if(!getAllTags().map(t=>t.toLowerCase()).includes(tag)){custom.push(tag);saveCustomTags(custom);}
+  if(!getAllTags().map(t=>t.toLowerCase()).includes(tag)){custom.push(tag);// saveCustomTags handled by remote}
   selectedTags.add(tag);renderTagSelector();renderFilterChips();
 }
 
-function showView(v){
+async function showView(v){
   ['dashboard','library','review','problem','add','import','settings'].forEach(x=>document.getElementById('view-'+x).classList.add('hidden'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('view-'+v).classList.remove('hidden');
   const idx=['dashboard','library','review','problem','add','import','settings'].indexOf(v);
   if(idx>=0)document.querySelectorAll('.nav-btn')[idx].classList.add('active');
-  if(v==='dashboard')renderDashboard();
-  if(v==='library'){renderFilterChips();renderLibrary();}
-  if(v==='review'){if(!reviewQueue.length)startReview();}
+  if(v==='dashboard')await renderDashboard();
+  if(v==='library'){renderFilterChips();await renderLibrary();}
+  if(v==='review'){if(!reviewQueue.length)await startReview();}
+
   if(v==='add'&&!editingId)resetForm();
   if(v==='import')resetImport();
-  if(v==='settings'){const k=getGeminiKey();if(k)document.getElementById('gemini-key-input').value=k;renderThemeChips();renderCustomTagsList();}
-  updateBadge();
+  if(v==='settings'){const k=getGeminiKey();if(k)document.getElementById('gemini-key-input').value=k;renderThemeChips();await renderCustomTagsList();}
+  await updateBadge();
 }
 
 // =====================
@@ -390,9 +510,9 @@ function renderThemeChips(){
   if(ci&&cur&&!PRESET_THEMES.includes(cur))ci.value=cur;
 }
 
-function renderCustomTagsList(){
+async function renderCustomTagsList(){
   const el=document.getElementById('custom-tags-list');if(!el)return;
-  const custom=loadCustomTags();
+  const custom=await loadCustomTags();
   if(!custom.length){el.innerHTML='<span style="font-size:13px;color:var(--text3);">Aucun tag personnalisé.</span>';return;}
   el.innerHTML=custom.map((t,i)=>`
     <span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;background:var(--bg2);border:0.5px solid var(--border2);font-size:13px;margin:2px;">
@@ -401,28 +521,28 @@ function renderCustomTagsList(){
     </span>`).join('');
 }
 
-function deleteCustomTag(i){
-  const custom=loadCustomTags();
+async function deleteCustomTag(i){
+  const custom=await loadCustomTags();
   const tag=custom[i];
-  custom.splice(i,1);
-  saveCustomTags(custom);
-  // Remove from selectedTags if present
+  await deleteCustomTagRemote(tag);
+  _tagsCache=null;
+  await loadCustomTags();
   selectedTags.delete(tag);
   renderCustomTagsList();
   renderTagSelector();
   renderFilterChips();
 }
 
-function selectTheme(t){
+async function selectTheme(t){
   setTheme(t);
   localStorage.removeItem('insp_cache_date');
   renderThemeChips();
-  renderDashboard();
+  await renderDashboard();
 }
 
-function renderDashboard(){
-  const data=loadData();
-  const due=getDue();
+async function renderDashboard(){
+  const data=await loadData();
+  const due=data.filter(isDue);
   const mastered=data.filter(c=>c.level>=5).length;
   const reviewed=data.filter(c=>c.lastReview).length;
 
@@ -493,7 +613,7 @@ async function renderInspiration(){
 
   el.innerHTML=`<div class="insp-card"><p style="color:#26215C;font-size:14px;font-style:italic;">Génération de l'inspiration du jour...</p></div>`;
 
-  const existing=loadData().map(c=>c.title).join(', ');
+  const existing=(_conceptsCache||[]).map(c=>c.title).join(', ');
   const prompt=`Tu es un expert en ${theme}. Propose un concept clé du domaine "${theme}" que quelqu'un devrait connaître. Ce concept ne doit PAS être dans cette liste : ${existing||'(vide)'}.
 
 Réponds UNIQUEMENT en JSON valide sans markdown :
@@ -546,9 +666,9 @@ function refreshInspiration(){
 // =====================
 // LIBRARY
 // =====================
-function renderLibrary(){
+async function renderLibrary(){
   const q=document.getElementById('search-input')?.value||'';
-  const data=loadData();
+  const data=await loadData();
   let f=data;
   if(q)f=f.filter(c=>c.title.toLowerCase().includes(q.toLowerCase()));
   if(currentFilter!=='all')f=f.filter(c=>(c.tags||[]).map(t=>t.toLowerCase()).includes(currentFilter));
@@ -571,8 +691,9 @@ function renderLibrary(){
 // =====================
 // MODAL
 // =====================
-function openModal(id){
-  const c=loadData().find(x=>x.id===id);if(!c)return;
+async function openModal(id){
+  const data=await loadData();
+  const c=data.find(x=>x.id===id);if(!c)return;
   currentId=id;
   const tags=(c.tags||[]).map(renderTagPill).join('');
   const next=c.nextReview?(isDue(c)?'Dû aujourd\'hui':'Prochaine révision : '+c.nextReview):'Jamais révisé';
@@ -593,17 +714,18 @@ function openModal(id){
 function closeModal(){document.getElementById('modal').classList.add('hidden');}
 document.getElementById('overlay').addEventListener('click',function(e){if(e.target===this)closeModal();});
 
-document.addEventListener('click',function(e){
+document.addEventListener('click',async function(e){
   const id=e.target.id||e.target.closest('[id]')?.id;
 
   if(id==='modal-review-btn'){
     if(!currentId)return;
-    closeModal();reviewQueue=[currentId];reviewStep=0;reviewRecall='';showView('review');
+    closeModal();reviewQueue=[currentId];reviewStep=0;reviewRecall='';await showView('review');
   }
 
   if(id==='modal-edit-btn'){
     if(!currentId)return;
-    const c=loadData().find(x=>x.id===currentId);if(!c)return;
+    const data=await loadData();
+    const c=data.find(x=>x.id===currentId);if(!c)return;
     editingId=currentId;closeModal();
     document.getElementById('f-title').value=c.title||'';
     document.getElementById('f-definition').value=c.definition||'';
@@ -622,20 +744,27 @@ document.addEventListener('click',function(e){
   if(id==='modal-delete-btn'){
     if(!currentId)return;
     if(!confirm('Supprimer ce concept ?'))return;
-    saveData(loadData().filter(c=>c.id!==currentId));
-    currentId=null;closeModal();renderLibrary();updateBadge();renderDashboard();
+    await deleteConceptRemote(currentId);
+    _conceptsCache=null;
+    currentId=null;closeModal();renderLibrary();(async()=>{
+  // Pre-load caches
+  await loadCustomTags();
+  await loadData();
+  updateBadge();
+  renderDashboard();
+})();
   }
 });
 
 // =====================
 // ADD / EDIT
 // =====================
-document.getElementById('add-btn').addEventListener('click',function(){
+document.getElementById('add-btn').addEventListener('click',async function(){
   const title=document.getElementById('f-title').value.trim();
   const definition=document.getElementById('f-definition').value.trim();
   if(!title){alert('Le nom est requis.');return;}
   if(!definition){alert('La définition est requise.');return;}
-  const data=loadData();
+  const data=await loadData();
   if(editingId){
     const idx=data.findIndex(c=>c.id===editingId);
     if(idx!==-1){
@@ -644,21 +773,26 @@ document.getElementById('add-btn').addEventListener('click',function(){
       data[idx].source=document.getElementById('f-source').value.trim();
       data[idx].tags=[...selectedTags];
       if(pendingImage)data[idx].image=pendingImage;
+      _conceptsCache=data;
+      await updateConceptRemote(data[idx]);
     }
     editingId=null;
   }else{
     if(data.find(c=>c.title.toLowerCase()===title.toLowerCase())){alert('Un concept avec ce nom existe déjà.');return;}
-    data.push({id:Date.now().toString(),title,definition,
+    const newC={id:Date.now().toString(),title,definition,
       application:document.getElementById('f-application').value.trim(),
       source:document.getElementById('f-source').value.trim(),
       tags:[...selectedTags],image:pendingImage,
-      level:0,nextReview:null,lastReview:null,createdAt:now()});
+      level:0,nextReview:null,lastReview:null,createdAt:now()};
+    data.push(newC);
+    _conceptsCache=data;
+    await saveConceptRemote(newC);
   }
-  saveData(data);resetForm();updateBadge();showView('library');
+  resetForm();await updateBadge();showView('library');
 });
 
-document.getElementById('clear-btn').addEventListener('click',resetForm);
-document.getElementById('cancel-edit-btn').addEventListener('click',function(){editingId=null;resetForm();showView('library');});
+document.getElementById('clear-btn').addEventListener('click',async function(){resetForm();});
+document.getElementById('cancel-edit-btn').addEventListener('click',async function(){editingId=null;resetForm();await showView('library');});
 document.getElementById('parse-md-btn').addEventListener('click',parseMarkdown);
 document.getElementById('f-image').addEventListener('change',function(){
   const file=this.files[0];if(!file)return;
@@ -688,25 +822,30 @@ document.addEventListener('click',function(e){
   }
   if(e.target.id==='save-custom-theme-btn'){
     const v=document.getElementById('custom-theme-input').value.trim();
-    if(v){selectTheme(v);document.getElementById('custom-theme-input').value='';}
+    if(v){await selectTheme(v);document.getElementById('custom-theme-input').value='';}
   }
   if(e.target.classList.contains('theme-chip')){
     selectTheme(e.target.textContent);
   }
   if(e.target.id==='reset-all-btn'){
     if(!confirm('Supprimer TOUS les concepts ? Irréversible.'))return;
-    localStorage.removeItem('cv5');
-    updateBadge();showView('dashboard');
+    const data=await loadData();
+    for(const c of data)await deleteConceptRemote(c.id);
+    _conceptsCache=[];
+    await updateBadge();showView('dashboard');
   }
   if(e.target.id==='add-insp-btn'){
     if(!_currentInspConcept){alert('Concept non disponible.');return;}
     const c=_currentInspConcept;
-    const data=loadData();
+    const data=await loadData();
     if(data.find(x=>x.title.toLowerCase()===c.title.toLowerCase())){alert('Ce concept est déjà dans ta base.');return;}
-    data.push({id:Date.now().toString(),title:c.title,definition:c.definition,
+    const newC={id:Date.now().toString(),title:c.title,definition:c.definition,
       application:c.application||'',source:c.source||'',tags:[],image:'',
-      level:0,nextReview:null,lastReview:null,createdAt:now()});
-    saveData(data);updateBadge();
+      level:0,nextReview:null,lastReview:null,createdAt:now()};
+    data.push(newC);
+    _conceptsCache=data;
+    await saveConceptRemote(newC);
+    await updateBadge();
     alert('"'+c.title+'" ajouté à ta bibliothèque !');
     renderDashboard();
   }
@@ -738,7 +877,7 @@ document.addEventListener('click',async function(e){
   if(e.target.id!=='problem-search-btn')return;
   const pb=document.getElementById('problem-input').value.trim();
   if(!pb){alert('Décris un problème d\'abord.');return;}
-  const data=loadData();
+  const data=await loadData();
   if(!data.length){alert('Aucun concept dans ta bibliothèque.');return;}
   const key=getGeminiKey();
   if(!key){
@@ -837,7 +976,7 @@ document.getElementById('bulk-input').addEventListener('change',function(){
 
 function processFiles(files){
   importQueue=[];
-  const existing=loadData();
+  const existing=_conceptsCache||[];
   const existingTitles=new Set(existing.map(c=>c.title.toLowerCase()));
   document.getElementById('import-preview').innerHTML=`<p style="font-size:13px;color:var(--text2);margin-bottom:10px;">Analyse de ${files.length} fichier${files.length>1?'s':''}...</p>`;
   let processed=0;
@@ -979,19 +1118,23 @@ document.addEventListener('click',function(e){
   if(e.target.id==='confirm-import-btn'){
     const toImport=importQueue.filter(r=>r.status==='ok'||r.status==='fixed');
     if(!toImport.length)return;
-    const data=loadData();
+    const data=await loadData();
     const existingTitlesSet=new Set(data.map(c=>c.title.toLowerCase()));
-    toImport.forEach(r=>{
-      if(existingTitlesSet.has(r.title.toLowerCase()))return;
+    let added=0;
+    for(const r of toImport){
+      if(existingTitlesSet.has(r.title.toLowerCase()))continue;
       existingTitlesSet.add(r.title.toLowerCase());
-      data.push({id:Date.now().toString()+Math.random(),title:r.title,definition:r.definition,
+      const newC={id:Date.now().toString()+Math.random(),title:r.title,definition:r.definition,
         application:r.application||'',source:r.source||'',tags:r.tags||[],image:'',
-        level:0,nextReview:null,lastReview:null,createdAt:now()});
-    });
-    saveData(data);updateBadge();
-    const n=toImport.length;
+        level:0,nextReview:null,lastReview:null,createdAt:now()};
+      data.push(newC);
+      await saveConceptRemote(newC);
+      added++;
+    }
+    _conceptsCache=data;
+    await updateBadge();
     resetImport();showView('library');
-    setTimeout(()=>alert(`${n} concept${n>1?'s':''} importé${n>1?'s':''} avec succès.`),100);
+    setTimeout(()=>alert(`${added} concept${added>1?'s':''} importé${added>1?'s':''} avec succès.`),100);
   }
   if(e.target.id==='reset-import-btn')resetImport();
 });
@@ -999,8 +1142,8 @@ document.addEventListener('click',function(e){
 // =====================
 // REVIEW
 // =====================
-function startReview(){
-  reviewQueue=getDue().map(c=>c.id);
+async function startReview(){
+  reviewQueue=(await getDue()).map(c=>c.id);
   if(!reviewQueue.length){
     document.getElementById('review-content').innerHTML='<div class="empty" style="padding:3rem 0;"><p style="font-size:16px;font-weight:500;margin-bottom:8px;">Rien à réviser aujourd\'hui</p><p>Tous tes concepts sont à jour.</p></div>';
     return;
@@ -1008,8 +1151,9 @@ function startReview(){
   reviewStep=0;reviewRecall='';renderReviewStep();
 }
 
-function renderReviewStep(){
-  const c=loadData().find(x=>x.id===reviewQueue[0]);
+async function renderReviewStep(){
+  const data=await loadData();
+  const c=data.find(x=>x.id===reviewQueue[0]);
   if(!c){nextConcept();return;}
   const total=reviewQueue.length;
   const dots=[0,1,2].map(i=>`<div class="dot ${i<reviewStep?'done':i===reviewStep?'active':''}"></div>`).join('');
@@ -1025,9 +1169,9 @@ function renderReviewStep(){
       <textarea class="recall-area" id="recall-input" placeholder="Écris ta définition..."></textarea>
       <button class="btn-p" id="see-def-btn">Voir la définition</button>
     </div>`;
-    document.getElementById('see-def-btn').addEventListener('click',function(){
+    document.getElementById('see-def-btn').addEventListener('click',async function(){
       reviewRecall=document.getElementById('recall-input')?.value||'';
-      reviewStep=1;renderReviewStep();
+      reviewStep=1;await renderReviewStep();
     });
   }else if(reviewStep===1){
     el.innerHTML=`${prog}<div class="step-dots">${dots}</div>
@@ -1047,10 +1191,10 @@ function renderReviewStep(){
       </div>
       <button class="btn-s" style="margin-top:10px;width:100%;" id="ai-q-btn">Questions IA</button>
     </div>`;
-    document.getElementById('rate0').addEventListener('click',()=>rate(0));
-    document.getElementById('rate1').addEventListener('click',()=>rate(1));
-    document.getElementById('rate2').addEventListener('click',()=>rate(2));
-    document.getElementById('ai-q-btn').addEventListener('click',()=>{reviewStep=2;renderReviewStep();});
+    document.getElementById('rate0').addEventListener('click',async()=>await rate(0));
+    document.getElementById('rate1').addEventListener('click',async()=>await rate(1));
+    document.getElementById('rate2').addEventListener('click',async()=>await rate(2));
+    document.getElementById('ai-q-btn').addEventListener('click',async()=>{reviewStep=2;await renderReviewStep();});
   }else{
     el.innerHTML=`${prog}<div class="step-dots">${dots}</div>
     <div class="card">
@@ -1058,29 +1202,31 @@ function renderReviewStep(){
       <div id="q-area"><p style="color:var(--text2);font-size:14px;font-style:italic;">Génération...</p></div>
       <button class="btn-s" style="margin-top:1rem;" id="back-btn">Retour</button>
     </div>`;
-    document.getElementById('back-btn').addEventListener('click',()=>{reviewStep=1;renderReviewStep();});
+    document.getElementById('back-btn').addEventListener('click',async()=>{reviewStep=1;await renderReviewStep();});
     genQuestions(c);
   }
 }
 
-function rate(r){
-  const data=loadData();
+async function rate(r){
+  const data=await loadData();
   const idx=data.findIndex(x=>x.id===reviewQueue[0]);
   if(idx===-1){nextConcept();return;}
   let lvl=data[idx].level||0;
   if(r===2)lvl=Math.min(lvl+1,INTERVALS.length-1);
   else if(r===0)lvl=Math.max(0,lvl-1);
   data[idx].level=lvl;data[idx].nextReview=addDays(now(),INTERVALS[lvl]);data[idx].lastReview=now();
-  saveData(data);nextConcept();
+  _conceptsCache=data;
+  await updateConceptRemote(data[idx]);
+  nextConcept();
 }
 
-function nextConcept(){
-  reviewQueue.shift();reviewStep=0;reviewRecall='';updateBadge();
+async function nextConcept(){
+  reviewQueue.shift();reviewStep=0;reviewRecall='';await updateBadge();
   if(!reviewQueue.length){
     document.getElementById('review-content').innerHTML='<div class="empty" style="padding:3rem 0;"><p style="font-size:16px;font-weight:500;margin-bottom:8px;">Session terminée</p><p>Tous les concepts révisés.</p></div>';
     return;
   }
-  renderReviewStep();
+  await renderReviewStep();
 }
 
 async function genQuestions(concept){
@@ -1115,7 +1261,13 @@ function parseMarkdown(){
   if(parsed.tags.length){selectedTags=new Set(parsed.tags);renderTagSelector();}
 }
 
-updateBadge();renderDashboard();
+(async()=>{
+  // Pre-load caches
+  await loadCustomTags();
+  await loadData();
+  updateBadge();
+  renderDashboard();
+})();
 </script>
 </body>
 </html>
