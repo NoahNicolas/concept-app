@@ -412,7 +412,7 @@ document.getElementById('add-btn').addEventListener('click',async function(){
     editingId=null;
   }else{
     if(data.find(c=>c.title.toLowerCase()===title.toLowerCase())){alert('Un concept avec ce nom existe déjà.');return;}
-    const newC={id:Date.now().toString(),title,definition,application:document.getElementById('f-application').value.trim(),source:document.getElementById('f-source').value.trim(),tags:[...selectedTags],image:pendingImage,level:0,nextReview:null,lastReview:null,createdAt:now()};
+    const newC={id:crypto.randomUUID(),title,definition,application:document.getElementById('f-application').value.trim(),source:document.getElementById('f-source').value.trim(),tags:[...selectedTags],image:pendingImage,level:0,nextReview:null,lastReview:null,createdAt:now()};
     showLoading('Ajout...');try{await addConceptDB(newC);}finally{hideLoading();}
   }
   resetForm();await updateBadge();await showView('library');
@@ -556,7 +556,7 @@ document.getElementById('confirm-import-btn').addEventListener('click',async fun
       if(existingTitles.has(r.title.toLowerCase()))continue;
       existingTitles.add(r.title.toLowerCase());
       const newC={
-        id:Date.now().toString()+Math.random(),
+        id:crypto.randomUUID(),
         title:r.title,definition:r.definition,
         application:r.application||'',source:r.source||'',
         tags:r.tags||[],image:'',level:0,
@@ -649,7 +649,7 @@ document.addEventListener('click',async function(e){
   if(e.target.id==='add-insp-btn'){
     if(!_currentInspConcept)return;const c=_currentInspConcept;const data=await getConcepts();
     if(data.find(x=>x.title.toLowerCase()===c.title.toLowerCase())){alert('Ce concept est déjà dans ta base.');return;}
-    const newC={id:Date.now().toString(),title:c.title,definition:c.definition,application:c.application||'',source:c.source||'',tags:[],image:'',level:0,nextReview:null,lastReview:null,createdAt:now()};
+    const newC={id:crypto.randomUUID(),title:c.title,definition:c.definition,application:c.application||'',source:c.source||'',tags:[],image:'',level:0,nextReview:null,lastReview:null,createdAt:now()};
     showLoading('Ajout...');try{await addConceptDB(newC);}finally{hideLoading();}
     await updateBadge();alert('"'+c.title+'" ajouté !');await renderDashboard();
   }
