@@ -460,7 +460,11 @@ document.getElementById('problem-search-btn').addEventListener('click',async fun
   try{
     const text=await callGemini(prompt);const parsed=JSON.parse(text.replace(/```json|```/g,'').trim());
     if(!parsed.results?.length){el.innerHTML='<p style="color:var(--text2);font-size:14px;">Aucune piste trouvée.</p>';return;}
-    el.innerHTML=parsed.results.map(r=>{const c=data.find(x=>x.title.toLowerCase()===r.title.toLowerCase())||data.find(x=>x.title.toLowerCase().includes(r.title.toLowerCase().substring(0,5)));return`<div class="result-card" ${c?`onclick="openModal('${c.id}')" style="cursor:pointer;"`:''}}><div class="result-title">${r.title}${c?' <span style="font-size:11px;color:var(--text3);">↗</span>':''}</div><div class="result-why">${r.why}</div></div>`;}).join('');
+    el.innerHTML=parsed.results.map(r=>{
+      const c=data.find(x=>x.title.toLowerCase()===r.title.toLowerCase())||data.find(x=>x.title.toLowerCase().includes(r.title.toLowerCase().substring(0,5)));
+      const clickable=c?`onclick="openModal('${c.id}')" style="cursor:pointer;"`:'' ;
+      return '<div class="result-card" '+clickable+'><div class="result-title">'+r.title+(c?' <span style="font-size:11px;color:var(--text3);">↗</span>':'')+'</div><div class="result-why">'+r.why+'</div></div>';
+    }).join('');
   }catch(err){el.innerHTML=`<p style="color:var(--danger);font-size:14px;">Erreur : ${err.message}</p>`;}
   this.disabled=false;
 });
