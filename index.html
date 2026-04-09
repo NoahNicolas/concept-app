@@ -640,17 +640,32 @@ async function genQuestions(concept){
   const key=getGeminiKey();
   if(!key){if(area)area.innerHTML='<p style="color:var(--danger);font-size:14px;">Configure ta clé Gemini dans Réglages.</p>';return;}
   try{
-    const text=await callGemini(
-      'Tu es un assistant pédagogique. Génère 3 questions de compréhension sur ce concept.\n'
-      +'Va au-delà de la définition : liens avec autres concepts, applications, nuances.\n\n'
-      +'Concept : '+concept.title+'\n'
-      +'Définition : '+concept.definition+'\n'
-      +(concept.application?'Application : '+concept.application+'\n':'')
-      +'\nPour chaque question, fournis une réponse de référence (2-3 phrases).\n\n'
-      +'Réponds UNIQUEMENT en JSON valide sans markdown :\n'
-      +'{"items":[{"question":"q1","answer":"r1"},{"question":"q2","answer":"r2"},{"question":"q3","answer":"r3"}]}'
-    );
-    const parsed=JSON.parse(text.replace(/```json|```/g,'').trim());
+    const promptText=[
+      'Tu es un assistant pédagogique. Génère 3 questions de compréhension sur ce concept.',
+      'Va au-delà de la définition : liens avec autres concepts, applications, nuances.',
+      '',
+      'Concept : '+concept.title,
+      'Définition : '+concept.definition,
+      concept.application?'Application : '+concept.application:'',
+      '',
+      'Pour chaque question, fournis une réponse de référence concise (2-3 phrases).',
+      'IMPORTANT : Dans tes réponses JSON, remplace toutes les apostrophes par des espaces.',
+      '',
+      'Réponds UNIQUEMENT en JSON valide sans markdown :',
+      '{"items":[{"question":"question 1","answer":"reponse 1"},{"question":"question 2","answer":"reponse 2"},{"question":"question 3","answer":"reponse 3"}]}'
+    ].join('\n');
+    const text=await callGemini(promptText);
+    let parsed;
+    try{
+      parsed=JSON.parse(text.replace(/```json|```/g,'').trim());
+    }catch(jsonErr){
+      // Gemini returned invalid JSON - extract questions with regex fallback
+      const qs=[];const as=[];
+      const qMatches=text.match(/"question"\s*:\s*"([^"]+)"/g)||[];
+      const aMatches=text.match(/"answer"\s*:\s*"([^"]+)"/g)||[];
+      qMatches.forEach((m,i)=>{qs.push({question:m.replace(/"question"\s*:\s*"/,'').replace(/"$/,''),answer:(aMatches[i]||'').replace(/"answer"\s*:\s*"/,'').replace(/"$/,'')});});
+      parsed={items:qs.length?qs:[{question:'Question non disponible',answer:''}]};
+    }
     if(!area)return;
     const items=parsed.items||[];
     let html=items.map((item,i)=>
