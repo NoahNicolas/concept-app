@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>Concept App</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#ffffff;--bg2:#f5f5f3;--bg3:#efefec;
+  --text:#1a1a1a;--text2:#6b6b6b;--text3:#9b9b9b;
+  --border:rgba(0,0,0,0.12);--border2:rgba(0,0,0,0.22);
+  --danger-bg:#fff0f0;--danger:#c0392b;
+  --success-bg:#f0faf4;--success:#1e7e44;
+  --info-bg:#eaf3ff;--info:#1a5fa8;
+  --radius:8px;--radius-lg:12px;
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --bg:#1c1c1e;--bg2:#2c2c2e;--bg3:#3a3a3c;
+    --text:#f2f2f7;--text2:#aeaeb2;--text3:#636366;
+    --border:rgba(255,255,255,0.12);--border2:rgba(255,255,255,0.22);
+    --danger-bg:#3a1a1a;--danger:#ff6b6b;
+    --success-bg:#1a3a24;--success:#4cd964;
+    --info-bg:#1a2a3a;--info:#5ac8fa;
+  }
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--text);background:var(--bg3);min-height:100vh;}
+#app{max-width:820px;margin:0 auto;padding:1.5rem 1rem;}
+@media(max-width:600px){#app{padding:1rem 0.75rem;}}
+nav{display:flex;gap:6px;margin-bottom:1.5rem;flex-wrap:wrap;}
+.nav-btn{padding:7px 14px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg);color:var(--text);cursor:pointer;font-size:13px;transition:all 0.15s;}
+.nav-btn.active{background:var(--text);color:var(--bg);}
+@media(max-width:500px){.nav-btn{padding:6px 10px;font-size:12px;}}
+.badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;font-size:11px;font-weight:500;background:var(--danger-bg);color:var(--danger);margin-left:4px;}
+.card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:12px;}
+.field{width:100%;padding:9px 12px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);font-family:inherit;font-size:15px;margin-bottom:10px;display:block;-webkit-appearance:none;}
+textarea.field{resize:vertical;min-height:80px;line-height:1.6;}
+.field:focus{outline:none;border-color:var(--text2);}
+.btn-p{padding:10px 22px;border-radius:var(--radius);border:none;background:var(--text);color:var(--bg);cursor:pointer;font-size:14px;font-weight:500;}
+.btn-s{padding:10px 22px;border-radius:var(--radius);border:0.5px solid var(--border2);background:transparent;color:var(--text);cursor:pointer;font-size:14px;}
+.btn-d{padding:8px 16px;border-radius:var(--radius);border:0.5px solid var(--danger);background:transparent;color:var(--danger);cursor:pointer;font-size:13px;}
+.btn-e{padding:8px 16px;border-radius:var(--radius);border:0.5px solid var(--border2);background:transparent;color:var(--text);cursor:pointer;font-size:13px;}
+.btn-xs{padding:5px 10px;border-radius:var(--radius);border:0.5px solid var(--border2);background:transparent;color:var(--text);cursor:pointer;font-size:12px;white-space:nowrap;}
+.btn-xs-p{padding:5px 10px;border-radius:var(--radius);border:none;background:var(--text);color:var(--bg);cursor:pointer;font-size:12px;white-space:nowrap;}
+button:active{opacity:0.75;}
+.hidden{display:none;}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.wrap{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+hr{border:none;border-top:0.5px solid var(--border);margin:1rem 0;}
+.empty{text-align:center;padding:3rem 1rem;color:var(--text2);font-size:14px;line-height:1.7;}
+.lbl{font-size:13px;color:var(--text2);margin-bottom:6px;display:block;}
+.tag{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:500;margin:2px;}
+.chip{display:inline-block;padding:6px 14px;border-radius:20px;border:0.5px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;font-size:13px;user-select:none;transition:all 0.12s;}
+.chip:hover{background:var(--bg2);}
+.chip-add{display:inline-block;padding:6px 12px;border-radius:20px;border:0.5px dashed var(--border2);background:transparent;color:var(--text3);cursor:pointer;font-size:13px;}
+.concept-row{display:flex;align-items:center;justify-content:space-between;padding:14px 1.25rem;border-bottom:0.5px solid var(--border);cursor:pointer;transition:background 0.1s;}
+.concept-row:hover{background:var(--bg2);}
+.concept-row:last-child{border-bottom:none;}
+.due-chip{font-size:11px;padding:3px 9px;border-radius:10px;background:var(--danger-bg);color:var(--danger);}
+.ok-chip{font-size:11px;padding:3px 9px;border-radius:10px;background:var(--success-bg);color:var(--success);}
+.new-chip{font-size:11px;padding:3px 9px;border-radius:10px;background:var(--info-bg);color:var(--info);}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:200;padding:1rem;}
+.modal{background:var(--bg);border-radius:var(--radius-lg);border:0.5px solid var(--border);width:100%;max-width:620px;max-height:90vh;overflow-y:auto;padding:2rem;}
+@media(max-width:600px){.modal{padding:1.25rem;max-height:95vh;}}
+.modal-title{font-size:22px;font-weight:500;line-height:1.3;margin-bottom:0.75rem;}
+.sec-lbl{font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:var(--text3);margin-bottom:8px;margin-top:1.5rem;display:block;}
+.def-box{background:#E6F1FB;border-radius:var(--radius);padding:1rem 1.25rem;font-size:16px;line-height:1.8;color:#042C53;border-left:3px solid #378ADD;}
+.app-box{background:#EEEDFE;border-radius:var(--radius);padding:1rem 1.25rem;font-size:15px;line-height:1.7;color:#26215C;border-left:3px solid #7F77DD;}
+@media(prefers-color-scheme:dark){
+  .def-box{background:#0C3050;color:#B5D4F4;border-left-color:#378ADD;}
+  .app-box{background:#26215C;color:#CECBF6;border-left-color:#7F77DD;}
+}
+.concept-img{width:100%;border-radius:var(--radius);margin-top:8px;object-fit:contain;max-height:320px;}
+.step-dots{display:flex;gap:6px;margin-bottom:1.5rem;}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--border2);}
+.dot.active{background:var(--text);}
+.dot.done{background:var(--text2);}
+.recall-area{width:100%;min-height:130px;font-size:15px;line-height:1.7;padding:12px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);font-family:inherit;resize:vertical;margin-bottom:1rem;display:block;}
+.recall-area:focus{outline:none;border-color:var(--text2);}
+.rating-row{display:flex;gap:8px;margin-top:1rem;}
+.rating-btn{flex:1;padding:12px 8px;border-radius:var(--radius);border:0.5px solid var(--border2);background:transparent;cursor:pointer;font-size:13px;text-align:center;}
+.r0{border-color:#E24B4A;color:#E24B4A;}
+.r1{border-color:#BA7517;color:#BA7517;}
+.r2{border-color:#639922;color:#639922;}
+.api-bar{background:var(--bg2);border-radius:var(--radius);padding:10px 14px;margin-bottom:1rem;display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.api-bar input{flex:1;min-width:120px;background:transparent;border:none;font-size:13px;color:var(--text);font-family:inherit;outline:none;margin:0;padding:0;}
+.tag-inp{padding:5px 10px;border-radius:20px;border:0.5px solid var(--border2);background:var(--bg);color:var(--text);font-size:13px;width:120px;outline:none;font-family:inherit;}
+.drop-zone{border:2px dashed var(--border2);border-radius:var(--radius-lg);padding:2rem 1rem;text-align:center;cursor:pointer;transition:all 0.15s;background:var(--bg);}
+.drop-zone:hover,.drop-zone.dragover{border-color:var(--text2);background:var(--bg2);}
+.drop-zone p{font-size:15px;color:var(--text2);margin-bottom:6px;}
+.drop-zone span{font-size:13px;color:var(--text3);}
+.preview-item{padding:10px 12px;border-radius:var(--radius);background:var(--bg2);margin-bottom:6px;font-size:14px;}
+.preview-item.ok{border-left:3px solid var(--success);}
+.preview-item.skip{border-left:3px solid var(--text3);opacity:0.6;}
+.preview-item.err{border-left:3px solid var(--danger);}
+.preview-item.fixed{border-left:3px solid var(--success);}
+.preview-item.excluded{border-left:3px solid var(--text3);opacity:0.35;}
+.import-summary{background:var(--bg2);border-radius:var(--radius);padding:1rem;margin-bottom:1rem;font-size:14px;line-height:1.7;}
+.mini-form{background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius);padding:1rem;margin-top:8px;}
+.mini-form .field{font-size:14px;margin-bottom:8px;}
+/* STATS */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:1rem;}
+.stat-card{background:var(--bg2);border-radius:var(--radius);padding:1rem;text-align:center;}
+.stat-num{font-size:28px;font-weight:500;margin-bottom:4px;}
+.stat-lbl{font-size:12px;color:var(--text2);}
+.daily-card{border-left:3px solid #378ADD;background:#E6F1FB;border-radius:var(--radius);padding:1.25rem;margin-bottom:1rem;}
+@media(prefers-color-scheme:dark){.daily-card{background:#0C3050;}}
+.daily-concept{font-size:20px;font-weight:500;margin-bottom:8px;color:#042C53;}
+@media(prefers-color-scheme:dark){.daily-concept{color:#B5D4F4;}}
+.daily-def{font-size:15px;line-height:1.7;color:#042C53;}
+@media(prefers-color-scheme:dark){.daily-def{color:#B5D4F4;}}
+.insp-card{border-left:3px solid #7F77DD;background:#EEEDFE;border-radius:var(--radius);padding:1.25rem;margin-bottom:1rem;}
+@media(prefers-color-scheme:dark){.insp-card{background:#1a1640;}}
+.insp-title{font-size:20px;font-weight:500;margin-bottom:8px;color:#26215C;}
+@media(prefers-color-scheme:dark){.insp-title{color:#CECBF6;}}
+.insp-body{font-size:15px;line-height:1.7;color:#26215C;}
+@media(prefers-color-scheme:dark){.insp-body{color:#CECBF6;}}
+.theme-chip{display:inline-block;padding:6px 14px;border-radius:20px;border:0.5px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;font-size:13px;margin:3px;user-select:none;}
+.theme-chip.sel{background:var(--text);color:var(--bg);border-color:var(--text);}
+/* PROBLEM SEARCH */
+.result-card{background:var(--bg2);border-radius:var(--radius);padding:1rem 1.25rem;margin-bottom:10px;border-left:3px solid #7F77DD;}
+.result-title{font-size:16px;font-weight:500;margin-bottom:6px;}
+.result-why{font-size:14px;color:var(--text2);line-height:1.6;}
+</style>
+</head>
+<body>
+<div id="app">
+  <nav>
+    <button class="nav-btn active" onclick="showView('dashboard')">Accueil</button>
+    <button class="nav-btn" onclick="showView('library')">Bibliothèque</button>
+    <button class="nav-btn" onclick="showView('review')">Révision <span class="badge" id="due-badge" style="display:none"></span></button>
+    <button class="nav-btn" onclick="showView('problem')">Problème</button>
+    <button class="nav-btn" onclick="showView('add')">+ Ajouter</button>
+    <button class="nav-btn" onclick="showView('import')">Import</button>
+    <button class="nav-btn" onclick="showView('settings')">Réglages</button>
+  </nav>
+
+  <!-- DASHBOARD -->
+  <div id="view-dashboard">
+    <div id="insp-section"></div>
+    <div class="stat-grid" id="stat-grid"></div>
+    <div id="due-section"></div>
+  </div>
+
+  <!-- LIBRARY -->
+  <div id="view-library" class="hidden">
+    <input class="field" type="text" placeholder="Rechercher..." id="search-input" oninput="renderLibrary()" style="margin-bottom:10px;"/>
+    <div class="wrap" id="filter-chips" style="margin-bottom:14px;"></div>
+    <div class="card" style="padding:0;" id="library-list"></div>
+  </div>
+
+  <!-- REVIEW -->
+  <div id="view-review" class="hidden">
+    <div id="review-content"></div>
+  </div>
+
+  <!-- PROBLEM -->
+  <div id="view-problem" class="hidden">
+    <div class="card">
+      <p style="font-size:18px;font-weight:500;margin-bottom:6px;">Chercher par problème</p>
+      <p style="font-size:14px;color:var(--text2);margin-bottom:1rem;">Décris un problème ou une situation, l'IA cherche dans tes concepts lesquels peuvent t'aider.</p>
+      <textarea class="field" id="problem-input" placeholder="Ex : j'ai du mal à faire accepter un changement à mon équipe..." style="min-height:100px;"></textarea>
+      <button class="btn-p" id="problem-search-btn">Chercher des pistes</button>
+      <div id="problem-results" style="margin-top:1.5rem;"></div>
+    </div>
+  </div>
+
+  <!-- ADD -->
+  <div id="view-add" class="hidden">
+    <div class="card">
+      <p id="form-title-label" style="font-size:18px;font-weight:500;margin-bottom:1.25rem;">Ajouter un concept</p>
+      <span class="lbl">Nom *</span>
+      <input class="field" type="text" id="f-title" placeholder="Ex : biais cognitif"/>
+      <span class="lbl">Définition *</span>
+      <textarea class="field" id="f-definition" placeholder="Ce que le concept signifie..."></textarea>
+      <span class="lbl">Application concrète</span>
+      <textarea class="field" id="f-application" placeholder="Exemples, cas d'usage..."></textarea>
+      <span class="lbl">Source</span>
+      <input class="field" type="text" id="f-source" placeholder="Ex : Ce livre vous fera gagner du temps"/>
+      <span class="lbl">Tags</span>
+      <div class="wrap" id="tag-selector" style="margin-bottom:16px;min-height:36px;"></div>
+      <span class="lbl">Image / Schéma</span>
+      <input class="field" type="file" id="f-image" accept="image/*" style="padding:6px;"/>
+      <img id="img-preview" style="display:none;width:100%;border-radius:var(--radius);margin-bottom:10px;max-height:220px;object-fit:contain;"/>
+      <hr/>
+      <span class="lbl">Ou coller ta note Obsidian (markdown)</span>
+      <textarea class="field" id="f-markdown" placeholder="Coller le contenu brut de ta note..." style="min-height:100px;"></textarea>
+      <button class="btn-s" style="margin-bottom:1rem;" id="parse-md-btn">Extraire depuis Obsidian</button>
+      <hr/>
+      <div class="row">
+        <button class="btn-p" id="add-btn">Ajouter le concept</button>
+        <button class="btn-s" id="clear-btn">Effacer</button>
+        <button class="btn-s hidden" id="cancel-edit-btn">Annuler</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- IMPORT -->
+  <div id="view-import" class="hidden">
+    <div class="card">
+      <p style="font-size:18px;font-weight:500;margin-bottom:4px;">Import en masse</p>
+      <p style="font-size:14px;color:var(--text2);margin-bottom:1.25rem;">Glisse tes fichiers .md ou clique pour sélectionner. Croix pour exclure, "Compléter" pour les fichiers en erreur.</p>
+      <div class="drop-zone" id="drop-zone" onclick="document.getElementById('bulk-input').click()">
+        <p>Glisse tes fichiers .md ici</p>
+        <span>ou clique pour sélectionner</span>
+      </div>
+      <input type="file" id="bulk-input" accept=".md" multiple style="display:none;"/>
+      <div id="import-preview" style="margin-top:1rem;"></div>
+      <div id="import-actions" class="hidden" style="margin-top:1rem;">
+        <div class="import-summary" id="import-summary"></div>
+        <div class="row">
+          <button class="btn-p" id="confirm-import-btn">Importer</button>
+          <button class="btn-s" id="reset-import-btn">Réinitialiser</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div id="view-settings" class="hidden">
+    <div class="card">
+      <p style="font-size:18px;font-weight:500;margin-bottom:1.25rem;">Réglages</p>
+      <span class="lbl">Clé API Gemini (gratuite sur aistudio.google.com)</span>
+      <div class="api-bar">
+        <input type="password" id="gemini-key-input" placeholder="AIza..."/>
+        <button class="btn-xs-p" id="save-gemini-btn">Enregistrer</button>
+      </div>
+      <p style="font-size:12px;color:var(--text3);margin-bottom:1.5rem;">Utilisée pour les questions IA, la recherche par problème et l'inspiration quotidienne.</p>
+      <hr/>
+      <span class="lbl">Thème de l'inspiration quotidienne</span>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:10px;">Chaque jour, l'IA te propose un concept nouveau lié à ce thème. Tu choisis de l'ajouter ou non.</p>
+      <div class="wrap" id="theme-chips" style="margin-bottom:10px;"></div>
+      <div style="display:flex;gap:8px;margin-top:4px;align-items:center;">
+        <input class="field" type="text" id="custom-theme-input" placeholder="Autre thème..." style="margin-bottom:0;flex:1;"/>
+        <button class="btn-xs-p" id="save-custom-theme-btn">OK</button>
+      </div>
+      <hr/>
+      <span class="lbl" style="color:var(--danger);">Zone de danger</span>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:10px;">Supprimer tous les concepts. Cette action est irréversible.</p>
+      <button class="btn-d" id="reset-all-btn">Supprimer tous les concepts</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DETAIL -->
+<div id="modal" class="hidden">
+  <div class="overlay" id="overlay">
+    <div class="modal">
+      <div id="modal-body"></div>
+      <hr/>
+      <div class="row" style="justify-content:space-between;margin-top:1rem;">
+        <div class="row">
+          <button class="btn-p" id="modal-review-btn">Réviser</button>
+          <button class="btn-e" id="modal-edit-btn">Modifier</button>
+        </div>
+        <button class="btn-d" id="modal-delete-btn">Supprimer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const INTERVALS=[1,4,10,21,30,90,180];
+const BASE_TAGS=['mse','coaching','management','changement'];
+const TAG_BG={mse:'#EEEDFE',coaching:'#E1F5EE',management:'#FAEEDA',changement:'#FAECE7'};
+const TAG_COLOR={mse:'#3C3489',coaching:'#085041',management:'#633806',changement:'#4A1B0C'};
+const TAG_BORDER={mse:'#AFA9EC',coaching:'#5DCAA5',management:'#EF9F27',changement:'#F0997B'};
+
+let currentFilter='all',currentId=null,editingId=null;
+let reviewQueue=[],reviewStep=0,reviewRecall='';
+let selectedTags=new Set(),pendingImage='';
+let importQueue=[];
+
+function loadData(){try{return JSON.parse(localStorage.getItem('cv5')||'[]');}catch{return[];}}
+function saveData(d){localStorage.setItem('cv5',JSON.stringify(d));}
+function loadCustomTags(){try{return JSON.parse(localStorage.getItem('cv5_tags')||'[]');}catch{return[];}}
+function saveCustomTags(t){localStorage.setItem('cv5_tags',JSON.stringify(t));}
+function getAllTags(){return[...BASE_TAGS,...loadCustomTags()];}
+function now(){return new Date().toISOString().split('T')[0];}
+function addDays(date,n){const d=new Date(date);d.setDate(d.getDate()+n);return d.toISOString().split('T')[0];}
+function isDue(c){return!c.nextReview||c.nextReview<=now();}
+function getDue(){return loadData().filter(isDue);}
+function getGeminiKey(){return localStorage.getItem('gemini_key')||'';}
+function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
+
+function tagStyle(t,sel){
+  const tl=t.toLowerCase();
+  if(sel)return`background:${TAG_BG[tl]||'#eee'};color:${TAG_COLOR[tl]||'#333'};border-color:${TAG_BORDER[tl]||'#ccc'};`;
+  return'';
+}
+function renderTagPill(t){
+  const tl=t.toLowerCase();
+  return`<span class="tag" style="background:${TAG_BG[tl]||'#eee'};color:${TAG_COLOR[tl]||'#555'};">${cap(t)}</span>`;
+}
+
+function cleanMd(text){
+  return text
+    .replace(/\[\[([^\]]+)\]\]/g,'$1')
+    .replace(/^---[\s\S]*?---\n?/,'')
+    .replace(/\*\*([^*]+)\*\*/g,'$1')
+    .replace(/\*([^*]+)\*/g,'$1')
+    .replace(/^---+$/gm,'')
+    .trim();
+}
+
+function updateBadge(){
+  const n=getDue().length,b=document.getElementById('due-badge');
+  b.style.display=n>0?'inline-flex':'none';b.textContent=n;
+}
+
+function renderFilterChips(){
+  const el=document.getElementById('filter-chips');if(!el)return;
+  const allSel=currentFilter==='all';
+  let h=`<span class="chip" style="${allSel?'background:var(--bg2);color:var(--text);border-color:var(--border2);':''}" onclick="setFilter('all')">Tous</span>`;
+  getAllTags().forEach(t=>{
+    h+=`<span class="chip" style="${tagStyle(t,currentFilter===t)}" onclick="setFilter('${t}')">${cap(t)}</span>`;
+  });
+  el.innerHTML=h;
+}
+
+function setFilter(tag){currentFilter=tag;renderFilterChips();renderLibrary();}
+
+function renderTagSelector(){
+  const el=document.getElementById('tag-selector');if(!el)return;
+  let h=getAllTags().map(t=>`<span class="chip" style="${tagStyle(t,selectedTags.has(t))}" onclick="toggleTag('${t}')">${cap(t)}</span>`).join('');
+  h+=`<span class="chip-add" onclick="addTagInput()">+ tag</span>`;
+  el.innerHTML=h;
+}
+
+function toggleTag(t){
+  if(selectedTags.has(t))selectedTags.delete(t);else selectedTags.add(t);
+  renderTagSelector();
+}
+
+function addTagInput(){
+  const el=document.getElementById('tag-selector');
+  if(el.querySelector('.tag-inp')){el.querySelector('.tag-inp').focus();return;}
+  const inp=document.createElement('input');
+  inp.className='tag-inp';inp.placeholder='nouveau...';
+  inp.addEventListener('keydown',function(e){
+    if(e.key==='Enter'){e.preventDefault();commitNewTag(this.value);this.remove();}
+    if(e.key==='Escape')this.remove();
+  });
+  inp.addEventListener('blur',function(){setTimeout(()=>{if(this.value.trim())commitNewTag(this.value);this.remove();},150);});
+  el.insertBefore(inp,el.querySelector('.chip-add'));inp.focus();
+}
+
+function commitNewTag(val){
+  const tag=val.trim().toLowerCase().replace(/\s+/g,'-');
+  if(!tag||tag.length<2)return;
+  const custom=loadCustomTags();
+  if(!getAllTags().includes(tag)){custom.push(tag);saveCustomTags(custom);}
+  selectedTags.add(tag);renderTagSelector();renderFilterChips();
+}
+
+function showView(v){
+  ['dashboard','library','review','problem','add','import','settings'].forEach(x=>document.getElementById('view-'+x).classList.add('hidden'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('view-'+v).classList.remove('hidden');
+  const idx=['dashboard','library','review','problem','add','import','settings'].indexOf(v);
+  if(idx>=0)document.querySelectorAll('.nav-btn')[idx].classList.add('active');
+  if(v==='dashboard')renderDashboard();
+  if(v==='library'){renderFilterChips();renderLibrary();}
+  if(v==='review'){if(!reviewQueue.length)startReview();}
+  if(v==='add'&&!editingId)resetForm();
+  if(v==='import')resetImport();
+  if(v==='settings'){const k=getGeminiKey();if(k)document.getElementById('gemini-key-input').value=k;renderThemeChips();}
+  updateBadge();
+}
+
+// =====================
+// DASHBOARD
+// =====================
+const PRESET_THEMES=['Management','Neurosciences','Psychologie','Coaching','Changement','MSE','Philosophie','Communication','Leadership','Économie'];
+
+function getTheme(){return localStorage.getItem('insp_theme')||'';}
+function setTheme(t){localStorage.setItem('insp_theme',t);}
+
+function renderThemeChips(){
+  const el=document.getElementById('theme-chips');if(!el)return;
+  const cur=getTheme();
+  el.innerHTML=PRESET_THEMES.map(t=>`<span class="theme-chip ${cur===t?'sel':''}" onclick="selectTheme('${t}')">${t}</span>`).join('');
+  const ci=document.getElementById('custom-theme-input');
+  if(ci&&cur&&!PRESET_THEMES.includes(cur))ci.value=cur;
+}
+
+function selectTheme(t){
+  setTheme(t);
+  localStorage.removeItem('insp_cache_date');
+  renderThemeChips();
+  renderDashboard();
+}
+
+function renderDashboard(){
+  const data=loadData();
+  const due=getDue();
+  const mastered=data.filter(c=>c.level>=5).length;
+  const reviewed=data.filter(c=>c.lastReview).length;
+
+  document.getElementById('stat-grid').innerHTML=`
+    <div class="stat-card"><div class="stat-num">${data.length}</div><div class="stat-lbl">Concepts total</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:var(--danger);">${due.length}</div><div class="stat-lbl">À réviser aujourd'hui</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:var(--success);">${mastered}</div><div class="stat-lbl">Maîtrisés (niv. 5+)</div></div>
+    <div class="stat-card"><div class="stat-num">${reviewed}</div><div class="stat-lbl">Déjà révisés</div></div>`;
+
+  // Inspiration du jour
+  renderInspiration();
+
+  // Due list
+  if(due.length){
+    document.getElementById('due-section').innerHTML=`
+      <div class="card" style="padding:0;">
+        <div style="padding:12px 1.25rem;font-size:13px;font-weight:500;color:var(--text2);border-bottom:0.5px solid var(--border);">À réviser aujourd'hui</div>
+        ${due.slice(0,5).map(c=>`<div class="concept-row" onclick="openModal('${c.id}')">
+          <div style="flex:1;min-width:0;font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.title}</div>
+          <span class="due-chip" style="flex-shrink:0;margin-left:8px;">J${INTERVALS[c.level||0]}</span>
+        </div>`).join('')}
+        ${due.length>5?`<div style="padding:10px 1.25rem;font-size:13px;color:var(--text3);">+${due.length-5} autres</div>`:''}
+      </div>
+      <button class="btn-p" style="width:100%;margin-top:4px;" onclick="showView('review')">Démarrer la révision</button>`;
+  }else if(data.length){
+    document.getElementById('due-section').innerHTML=`<p style="text-align:center;color:var(--success);font-size:14px;padding:1rem;">Tous tes concepts sont à jour.</p>`;
+  }else{
+    document.getElementById('due-section').innerHTML=`<p style="text-align:center;color:var(--text2);font-size:14px;padding:1rem;">Ajoute ton premier concept via + Ajouter ou Import.</p>`;
+  }
+}
+
+async function renderInspiration(){
+  const el=document.getElementById('insp-section');if(!el)return;
+  const theme=getTheme();
+  if(!theme){
+    el.innerHTML=`<div class="insp-card">
+      <div style="font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:#7F77DD;margin-bottom:8px;">Inspiration du jour</div>
+      <p class="insp-body">Choisis un thème dans <strong>Réglages</strong> pour recevoir un concept inspirant chaque jour.</p>
+      <button class="btn-xs" style="margin-top:12px;" onclick="showView('settings')">Choisir un thème</button>
+    </div>`;
+    return;
+  }
+
+  // Cache par jour
+  const today=now();
+  const cacheDate=localStorage.getItem('insp_cache_date');
+  const cacheData=localStorage.getItem('insp_cache');
+  if(cacheDate===today&&cacheData){
+    try{renderInspCard(JSON.parse(cacheData),theme);return;}catch(e){}
+  }
+
+  const key=getGeminiKey();
+  if(!key){
+    el.innerHTML=`<div class="insp-card">
+      <div style="font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:#7F77DD;margin-bottom:8px;">Inspiration du jour — ${theme}</div>
+      <p class="insp-body">Configure ta clé Gemini dans Réglages pour activer l'inspiration quotidienne.</p>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML=`<div class="insp-card"><p style="color:#26215C;font-size:14px;font-style:italic;">Génération de l'inspiration du jour...</p></div>`;
+
+  const existing=loadData().map(c=>c.title).join(', ');
+  const prompt=`Tu es un expert en ${theme}. Propose un concept clé du domaine "${theme}" que quelqu'un devrait connaître. Ce concept ne doit PAS être dans cette liste : ${existing||'(vide)'}.
+
+Réponds UNIQUEMENT en JSON valide sans markdown :
+{"title":"nom du concept","definition":"définition claire en 2-3 phrases","application":"exemple concret d'application en 1-2 phrases","source":"auteur ou ouvrage de référence si possible"}`;
+
+  try{
+    const text=await callGemini(prompt);
+    const clean=text.replace(/\`\`\`json|\`\`\`/g,'').trim();
+    const parsed=JSON.parse(clean);
+    localStorage.setItem('insp_cache',JSON.stringify(parsed));
+    localStorage.setItem('insp_cache_date',today);
+    renderInspCard(parsed,theme);
+  }catch(e){
+    el.innerHTML=`<div class="insp-card"><p style="color:var(--danger);font-size:14px;">Erreur de génération. Vérifie ta clé Gemini.</p></div>`;
+  }
+}
+
+function renderInspCard(c,theme){
+  const el=document.getElementById('insp-section');if(!el)return;
+  el.innerHTML=`<div class="insp-card">
+    <div style="font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:#7F77DD;margin-bottom:8px;">Inspiration du jour — ${theme}</div>
+    <div class="insp-title">${c.title}</div>
+    <div class="insp-body" style="margin-bottom:10px;">${c.definition}</div>
+    ${c.application?`<div style="font-size:14px;line-height:1.6;color:#3C3489;font-style:italic;margin-bottom:10px;">${c.application}</div>`:''}
+    ${c.source?`<div style="font-size:12px;color:#7F77DD;margin-bottom:12px;">Source : ${c.source}</div>`:''}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn-xs-p" onclick="addInspiration(${JSON.stringify(JSON.stringify(c))})">+ Ajouter à ma base</button>
+      <button class="btn-xs" onclick="refreshInspiration()">Autre concept</button>
+    </div>
+  </div>`;
+}
+
+function addInspiration(jsonStr){
+  const c=JSON.parse(jsonStr);
+  const data=loadData();
+  if(data.find(x=>x.title.toLowerCase()===c.title.toLowerCase())){alert('Ce concept est déjà dans ta base.');return;}
+  data.push({id:Date.now().toString(),title:c.title,definition:c.definition,
+    application:c.application||'',source:c.source||'',tags:[],image:'',
+    level:0,nextReview:null,lastReview:null,createdAt:now()});
+  saveData(data);updateBadge();
+  localStorage.removeItem('insp_cache_date');
+  alert(`"${c.title}" ajouté à ta bibliothèque !`);
+  renderDashboard();
+}
+
+function refreshInspiration(){
+  localStorage.removeItem('insp_cache_date');
+  localStorage.removeItem('insp_cache');
+  renderInspiration();
+}
+
+// =====================
+// LIBRARY
+// =====================
+function renderLibrary(){
+  const q=document.getElementById('search-input')?.value||'';
+  const data=loadData();
+  let f=data;
+  if(q)f=f.filter(c=>c.title.toLowerCase().includes(q.toLowerCase()));
+  if(currentFilter!=='all')f=f.filter(c=>(c.tags||[]).map(t=>t.toLowerCase()).includes(currentFilter));
+  const el=document.getElementById('library-list');
+  if(!data.length){el.innerHTML='<div class="empty">Aucun concept<br/>Ajoute-en un via +</div>';return;}
+  if(!f.length){el.innerHTML='<div class="empty">Aucun résultat.</div>';return;}
+  el.innerHTML=f.map(c=>{
+    const chip=!c.nextReview?'<span class="new-chip">nouveau</span>':isDue(c)?'<span class="due-chip">à réviser</span>':'<span class="ok-chip">OK</span>';
+    const tags=(c.tags||[]).map(renderTagPill).join('');
+    return`<div class="concept-row" onclick="openModal('${c.id}')">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:15px;font-weight:500;margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.title}</div>
+        <div class="wrap">${tags}</div>
+      </div>
+      <div style="flex-shrink:0;margin-left:12px;">${chip}</div>
+    </div>`;
+  }).join('');
+}
+
+// =====================
+// MODAL
+// =====================
+function openModal(id){
+  const c=loadData().find(x=>x.id===id);if(!c)return;
+  currentId=id;
+  const tags=(c.tags||[]).map(renderTagPill).join('');
+  const next=c.nextReview?(isDue(c)?'Dû aujourd\'hui':'Prochaine révision : '+c.nextReview):'Jamais révisé';
+  document.getElementById('modal-body').innerHTML=`
+    <div style="margin-bottom:1.25rem;">
+      <div class="wrap" style="margin-bottom:10px;">${tags}</div>
+      <p class="modal-title">${c.title}</p>
+      <p style="font-size:12px;color:var(--text3);">Niveau ${c.level||0} — ${next}</p>
+    </div>
+    <span class="sec-lbl">Définition</span>
+    <div class="def-box">${c.definition}</div>
+    ${c.application?`<span class="sec-lbl">Application concrète</span><div class="app-box">${c.application}</div>`:''}
+    ${c.source?`<span class="sec-lbl">Source</span><p style="font-size:14px;color:var(--text2);margin-top:4px;">${c.source}</p>`:''}
+    ${c.image?`<span class="sec-lbl">Schéma</span><img class="concept-img" src="${c.image}"/>`:''}`;
+  document.getElementById('modal').classList.remove('hidden');
+}
+
+function closeModal(){document.getElementById('modal').classList.add('hidden');}
+document.getElementById('overlay').addEventListener('click',function(e){if(e.target===this)closeModal();});
+
+document.addEventListener('click',function(e){
+  const id=e.target.id||e.target.closest('[id]')?.id;
+
+  if(id==='modal-review-btn'){
+    if(!currentId)return;
+    closeModal();reviewQueue=[currentId];reviewStep=0;reviewRecall='';showView('review');
+  }
+
+  if(id==='modal-edit-btn'){
+    if(!currentId)return;
+    const c=loadData().find(x=>x.id===currentId);if(!c)return;
+    editingId=currentId;closeModal();
+    document.getElementById('f-title').value=c.title||'';
+    document.getElementById('f-definition').value=c.definition||'';
+    document.getElementById('f-application').value=c.application||'';
+    document.getElementById('f-source').value=c.source||'';
+    selectedTags=new Set(c.tags||[]);
+    pendingImage=c.image||'';
+    const prev=document.getElementById('img-preview');
+    if(pendingImage){prev.src=pendingImage;prev.style.display='block';}else prev.style.display='none';
+    document.getElementById('form-title-label').textContent='Modifier le concept';
+    document.getElementById('add-btn').textContent='Enregistrer';
+    document.getElementById('cancel-edit-btn').classList.remove('hidden');
+    renderTagSelector();showView('add');
+  }
+
+  if(id==='modal-delete-btn'){
+    if(!currentId)return;
+    if(!confirm('Supprimer ce concept ?'))return;
+    saveData(loadData().filter(c=>c.id!==currentId));
+    currentId=null;closeModal();renderLibrary();updateBadge();renderDashboard();
+  }
+});
+
+// =====================
+// ADD / EDIT
+// =====================
+document.getElementById('add-btn').addEventListener('click',function(){
+  const title=document.getElementById('f-title').value.trim();
+  const definition=document.getElementById('f-definition').value.trim();
+  if(!title){alert('Le nom est requis.');return;}
+  if(!definition){alert('La définition est requise.');return;}
+  const data=loadData();
+  if(editingId){
+    const idx=data.findIndex(c=>c.id===editingId);
+    if(idx!==-1){
+      data[idx].title=title;data[idx].definition=definition;
+      data[idx].application=document.getElementById('f-application').value.trim();
+      data[idx].source=document.getElementById('f-source').value.trim();
+      data[idx].tags=[...selectedTags];
+      if(pendingImage)data[idx].image=pendingImage;
+    }
+    editingId=null;
+  }else{
+    data.push({id:Date.now().toString(),title,definition,
+      application:document.getElementById('f-application').value.trim(),
+      source:document.getElementById('f-source').value.trim(),
+      tags:[...selectedTags],image:pendingImage,
+      level:0,nextReview:null,lastReview:null,createdAt:now()});
+  }
+  saveData(data);resetForm();updateBadge();showView('library');
+});
+
+document.getElementById('clear-btn').addEventListener('click',resetForm);
+document.getElementById('cancel-edit-btn').addEventListener('click',function(){editingId=null;resetForm();showView('library');});
+document.getElementById('parse-md-btn').addEventListener('click',parseMarkdown);
+document.getElementById('f-image').addEventListener('change',function(){
+  const file=this.files[0];if(!file)return;
+  const r=new FileReader();
+  r.onload=e=>{pendingImage=e.target.result;const img=document.getElementById('img-preview');img.src=pendingImage;img.style.display='block';};
+  r.readAsDataURL(file);
+});
+
+function resetForm(){
+  ['f-title','f-definition','f-application','f-source','f-markdown'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  selectedTags=new Set();pendingImage='';editingId=null;
+  document.getElementById('img-preview').style.display='none';
+  document.getElementById('f-image').value='';
+  document.getElementById('form-title-label').textContent='Ajouter un concept';
+  document.getElementById('add-btn').textContent='Ajouter le concept';
+  document.getElementById('cancel-edit-btn').classList.add('hidden');
+  renderTagSelector();
+}
+
+// =====================
+// SETTINGS
+// =====================
+document.addEventListener('click',function(e){
+  if(e.target.id==='save-gemini-btn'){
+    const v=document.getElementById('gemini-key-input').value.trim();
+    if(v){localStorage.setItem('gemini_key',v);alert('Clé API Gemini enregistrée.');}
+  }
+  if(e.target.id==='save-custom-theme-btn'){
+    const v=document.getElementById('custom-theme-input').value.trim();
+    if(v){selectTheme(v);document.getElementById('custom-theme-input').value='';}
+  }
+  if(e.target.classList.contains('theme-chip')){
+    selectTheme(e.target.textContent);
+  }
+  if(e.target.id==='reset-all-btn'){
+    if(!confirm('Supprimer TOUS les concepts ? Irréversible.'))return;
+    localStorage.removeItem('cv5');
+    updateBadge();showView('dashboard');
+  }
+});
+
+// =====================
+// GEMINI API
+// =====================
+async function callGemini(prompt){
+  const key=getGeminiKey();
+  if(!key)throw new Error('no_key');
+  const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
+  });
+  const data=await resp.json();
+  if(data.error)throw new Error(data.error.message);
+  return data.candidates?.[0]?.content?.parts?.[0]?.text||'';
+}
+
+// =====================
+// PROBLEM SEARCH
+// =====================
+document.addEventListener('click',async function(e){
+  if(e.target.id!=='problem-search-btn')return;
+  const pb=document.getElementById('problem-input').value.trim();
+  if(!pb){alert('Décris un problème d\'abord.');return;}
+  const data=loadData();
+  if(!data.length){alert('Aucun concept dans ta bibliothèque.');return;}
+  const key=getGeminiKey();
+  if(!key){
+    document.getElementById('problem-results').innerHTML='<p style="color:var(--danger);font-size:14px;">Configure ta clé API Gemini dans Réglages d\'abord.</p>';
+    return;
+  }
+  const el=document.getElementById('problem-results');
+  el.innerHTML='<p style="color:var(--text2);font-size:14px;font-style:italic;">Analyse en cours...</p>';
+  e.target.disabled=true;
+  const conceptsJson=data.map(c=>({title:c.title,definition:c.definition,application:c.application||''}));
+  const prompt=`Tu es un assistant expert en pensée conceptuelle. Un utilisateur a un problème et tu dois trouver dans sa bibliothèque de concepts lesquels peuvent l'aider à le résoudre ou l'éclairer.\n\nProblème : "${pb}"\n\nBibliothèque de concepts (JSON) :\n${JSON.stringify(conceptsJson,null,0)}\n\nSélectionne les 3 concepts les plus pertinents. Pour chacun, explique en 2-3 phrases pourquoi ce concept est une piste utile pour ce problème spécifique.\n\nRéponds UNIQUEMENT en JSON valide sans markdown :\n{"results":[{"title":"nom exact du concept","why":"explication"},{"title":"...","why":"..."},{"title":"...","why":"..."}]}`;
+  try{
+    const text=await callGemini(prompt);
+    const clean=text.replace(/```json|```/g,'').trim();
+    const parsed=JSON.parse(clean);
+    if(!parsed.results||!parsed.results.length){el.innerHTML='<p style="color:var(--text2);font-size:14px;">Aucune piste trouvée.</p>';return;}
+    el.innerHTML=parsed.results.map(r=>{
+      const c=data.find(x=>x.title.toLowerCase()===r.title.toLowerCase())||data.find(x=>x.title.toLowerCase().includes(r.title.toLowerCase().substring(0,5)));
+      return`<div class="result-card" ${c?`onclick="openModal('${c.id}')" style="cursor:pointer;"`:''}>
+        <div class="result-title">${r.title}${c?' <span style="font-size:11px;color:var(--text3);">↗ voir</span>':''}</div>
+        <div class="result-why">${r.why}</div>
+      </div>`;
+    }).join('');
+  }catch(err){
+    if(err.message==='no_key'){el.innerHTML='<p style="color:var(--danger);font-size:14px;">Configure ta clé API Gemini dans Réglages.</p>';}
+    else{el.innerHTML=`<p style="color:var(--danger);font-size:14px;">Erreur : ${err.message}</p>`;}
+  }
+  e.target.disabled=false;
+});
+
+// =====================
+// IMPORT
+// =====================
+function parseMdContent(content,filename){
+  const cleaned=content.replace(/^---[\s\S]*?---\n?/,'');
+  const lines=cleaned.split('\n');
+  let title='',definition='',application='',source='';
+  const tags=[];
+
+  const h1=lines.find(l=>/^#\s+/.test(l));
+  if(h1)title=h1.replace(/^#\s+/,'').replace(/\[\[([^\]]+)\]\]/g,'$1').replace(/\*|_/g,'').trim();
+  if(!title)title=filename.replace(/\.md$/,'');
+
+  const tagLine=lines.find(l=>l.includes('Tags')&&l.includes('#'));
+  if(tagLine){
+    const found=(tagLine.match(/#[\w\u00C0-\u017E]+/g)||[]).map(t=>t.replace('#','').toLowerCase());
+    getAllTags().forEach(cat=>{if(found.includes(cat))tags.push(cat);});
+  }
+
+  let sec='';
+  for(const line of lines){
+    if(/^#{1,4}\s+.*[Dd][ée]finition/.test(line)){sec='def';continue;}
+    if(/^#{1,4}\s+.*[Aa]pplication/.test(line)){sec='app';continue;}
+    if(/^#{1,4}\s+.*([Rr][ée]trolien|[Cc]ontexte|[Ss]ource)/.test(line)){sec='src';continue;}
+    if(/^#{1,4}/.test(line)){sec='';continue;}
+    if(/^---+$/.test(line.trim()))continue;
+    if(sec==='def'&&line.trim()){
+      let l=line.replace(/\[\[([^\]]+)\]\]/g,'$1').replace(/^\*+|\*+$/g,'').trim();
+      if(l)definition+=l+'\n';
+    }
+    if(sec==='app'&&line.trim()){
+      let l=line.replace(/\[\[([^\]]+)\]\]/g,'$1').replace(/^\*+|\*+$/g,'').trim();
+      if(l)application+=l+'\n';
+    }
+    if(sec==='src'){
+      const m=line.match(/[Ss]ource[^:]*:\*?\s*\*?\s*\[\[([^\]]+)\]\]/);
+      if(m)source=m[1].trim();
+      else{
+        const m2=line.match(/[Ss]ource[^:]*:\*?\s*\*?\s*(.+)/);
+        if(m2)source=m2[1].replace(/\[\[([^\]]+)\]\]/g,'$1').replace(/\*|_/g,'').trim();
+      }
+    }
+  }
+  return{title:title.trim(),definition:definition.trim(),application:application.trim(),source,tags};
+}
+
+function resetImport(){
+  importQueue=[];
+  document.getElementById('import-preview').innerHTML='';
+  document.getElementById('import-actions').classList.add('hidden');
+  document.getElementById('bulk-input').value='';
+}
+
+const dropZone=document.getElementById('drop-zone');
+dropZone.addEventListener('dragover',function(e){e.preventDefault();this.classList.add('dragover');});
+dropZone.addEventListener('dragleave',function(){this.classList.remove('dragover');});
+dropZone.addEventListener('drop',function(e){
+  e.preventDefault();this.classList.remove('dragover');
+  const files=[...e.dataTransfer.files].filter(f=>f.name.endsWith('.md'));
+  if(files.length)processFiles(files);
+});
+document.getElementById('bulk-input').addEventListener('change',function(){
+  const files=[...this.files].filter(f=>f.name.endsWith('.md'));
+  if(files.length)processFiles(files);
+});
+
+function processFiles(files){
+  importQueue=[];
+  const existing=loadData();
+  const existingTitles=new Set(existing.map(c=>c.title.toLowerCase()));
+  document.getElementById('import-preview').innerHTML=`<p style="font-size:13px;color:var(--text2);margin-bottom:10px;">Analyse de ${files.length} fichier${files.length>1?'s':''}...</p>`;
+  let processed=0;
+  const results=[];
+  files.forEach(file=>{
+    const reader=new FileReader();
+    reader.onload=function(e){
+      const parsed=parseMdContent(e.target.result,file.name);
+      let status='ok',reason='';
+      if(!parsed.definition){status='err';reason='Section Définition introuvable';}
+      else if(existingTitles.has(parsed.title.toLowerCase())){status='skip';reason='Déjà présent';}
+      results.push({...parsed,filename:file.name,status,reason,uid:'i'+Date.now()+'_'+Math.random(),miniOpen:false,miniDef:'',miniApp:'',miniSrc:'',miniTags:new Set(parsed.tags)});
+      processed++;
+      if(processed===files.length){
+        results.sort((a,b)=>a.filename.localeCompare(b.filename));
+        importQueue=results;
+        renderImportPreview();
+      }
+    };
+    reader.readAsText(file);
+  });
+}
+
+function renderImportPreview(){
+  const ok=importQueue.filter(r=>r.status==='ok'||r.status==='fixed');
+  const skip=importQueue.filter(r=>r.status==='skip');
+  const err=importQueue.filter(r=>r.status==='err');
+  const excl=importQueue.filter(r=>r.status==='excluded');
+
+  document.getElementById('import-summary').innerHTML=
+    `<strong>${ok.length}</strong> prêt${ok.length>1?'s':''} &nbsp;·&nbsp; `+
+    `<span style="color:var(--text3)">${skip.length} doublon${skip.length>1?'s':''}</span> &nbsp;·&nbsp; `+
+    `<span style="color:var(--danger)">${err.length} à compléter</span>`+
+    (excl.length?` &nbsp;·&nbsp; <span style="color:var(--text3)">${excl.length} exclus</span>`:'');
+
+  document.getElementById('import-preview').innerHTML=importQueue.map((r,i)=>`
+    <div class="preview-item ${r.status==='fixed'?'ok':r.status}" id="pi_${i}">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.title}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px;">${r.filename}</div>
+          ${r.tags&&r.tags.length?`<div style="margin-top:4px;">${r.tags.map(renderTagPill).join('')}</div>`:''}
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
+          ${r.status==='ok'?'<span style="font-size:12px;color:var(--success);">✓</span>':''}
+          ${r.status==='fixed'?'<span style="font-size:12px;color:var(--success);">✓ complété</span>':''}
+          ${r.status==='skip'?'<span style="font-size:12px;color:var(--text3);">doublon</span>':''}
+          ${r.status==='excluded'?`<button class="btn-xs" onclick="restoreItem(${i})">Restaurer</button>`:''}
+          ${r.status==='err'?`<button class="btn-xs" onclick="toggleMiniForm(${i})">Compléter</button>`:''}
+          ${r.status!=='excluded'?`<button onclick="excludeItem(${i})" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:16px;line-height:1;padding:2px 4px;" title="Exclure">×</button>`:''}
+        </div>
+      </div>
+      ${r.status==='err'?`
+        <div id="mf_${i}" style="display:${r.miniOpen?'block':'none'};">
+          <div class="mini-form">
+            <span class="lbl" style="margin-top:0;">Définition *</span>
+            <textarea class="field" id="mf_def_${i}" placeholder="Écris la définition..." style="min-height:70px;">${r.miniDef||''}</textarea>
+            <span class="lbl">Application concrète</span>
+            <textarea class="field" id="mf_app_${i}" placeholder="Exemples..." style="min-height:50px;">${r.miniApp||''}</textarea>
+            <span class="lbl">Source</span>
+            <input class="field" id="mf_src_${i}" placeholder="Source..." value="${r.miniSrc||''}"/>
+            <span class="lbl">Tags</span>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+              ${getAllTags().map(t=>`<span class="chip" style="${tagStyle(t,r.miniTags&&r.miniTags.has(t))}" onclick="toggleMiniTag(${i},'${t}')">${cap(t)}</span>`).join('')}
+            </div>
+            <div class="row">
+              <button class="btn-xs-p" onclick="saveMiniForm(${i})">Valider</button>
+              <button class="btn-xs" onclick="toggleMiniForm(${i})">Annuler</button>
+            </div>
+          </div>
+        </div>`:''}
+    </div>`).join('');
+
+  const hasReady=importQueue.some(r=>r.status==='ok'||r.status==='fixed');
+  const btn=document.getElementById('confirm-import-btn');
+  btn.disabled=!hasReady;btn.style.opacity=hasReady?'1':'0.4';
+  document.getElementById('import-actions').classList.remove('hidden');
+}
+
+function excludeItem(i){importQueue[i].status='excluded';importQueue[i].miniOpen=false;renderImportPreview();}
+function restoreItem(i){
+  const r=importQueue[i];
+  importQueue[i].status=r.definition?'ok':'err';
+  renderImportPreview();
+}
+
+function toggleMiniForm(i){
+  const r=importQueue[i];
+  const defEl=document.getElementById(`mf_def_${i}`);
+  const appEl=document.getElementById(`mf_app_${i}`);
+  const srcEl=document.getElementById(`mf_src_${i}`);
+  if(defEl)r.miniDef=defEl.value;
+  if(appEl)r.miniApp=appEl.value;
+  if(srcEl)r.miniSrc=srcEl.value;
+  r.miniOpen=!r.miniOpen;
+  renderImportPreview();
+  if(r.miniOpen)setTimeout(()=>{const el=document.getElementById(`mf_def_${i}`);if(el)el.focus();},50);
+}
+
+function toggleMiniTag(i,tag){
+  const r=importQueue[i];
+  if(!r.miniTags)r.miniTags=new Set();
+  if(r.miniTags.has(tag))r.miniTags.delete(tag);else r.miniTags.add(tag);
+  const defEl=document.getElementById(`mf_def_${i}`);
+  const appEl=document.getElementById(`mf_app_${i}`);
+  const srcEl=document.getElementById(`mf_src_${i}`);
+  if(defEl)r.miniDef=defEl.value;
+  if(appEl)r.miniApp=appEl.value;
+  if(srcEl)r.miniSrc=srcEl.value;
+  renderImportPreview();
+}
+
+function saveMiniForm(i){
+  const defEl=document.getElementById(`mf_def_${i}`);
+  const appEl=document.getElementById(`mf_app_${i}`);
+  const srcEl=document.getElementById(`mf_src_${i}`);
+  const def=(defEl?defEl.value:'').trim();
+  if(!def){alert('La définition est requise.');return;}
+  importQueue[i].definition=def;
+  importQueue[i].application=appEl?appEl.value.trim():'';
+  importQueue[i].source=srcEl?srcEl.value.trim():'';
+  importQueue[i].tags=importQueue[i].miniTags?[...importQueue[i].miniTags]:[];
+  importQueue[i].status='fixed';
+  importQueue[i].miniOpen=false;
+  renderImportPreview();
+}
+
+document.addEventListener('click',function(e){
+  if(e.target.id==='confirm-import-btn'){
+    const toImport=importQueue.filter(r=>r.status==='ok'||r.status==='fixed');
+    if(!toImport.length)return;
+    const data=loadData();
+    toImport.forEach(r=>{
+      data.push({id:Date.now().toString()+Math.random(),title:r.title,definition:r.definition,
+        application:r.application||'',source:r.source||'',tags:r.tags||[],image:'',
+        level:0,nextReview:null,lastReview:null,createdAt:now()});
+    });
+    saveData(data);updateBadge();
+    const n=toImport.length;
+    resetImport();showView('library');
+    setTimeout(()=>alert(`${n} concept${n>1?'s':''} importé${n>1?'s':''} avec succès.`),100);
+  }
+  if(e.target.id==='reset-import-btn')resetImport();
+});
+
+// =====================
+// REVIEW
+// =====================
+function startReview(){
+  reviewQueue=getDue().map(c=>c.id);
+  if(!reviewQueue.length){
+    document.getElementById('review-content').innerHTML='<div class="empty" style="padding:3rem 0;"><p style="font-size:16px;font-weight:500;margin-bottom:8px;">Rien à réviser aujourd\'hui</p><p>Tous tes concepts sont à jour.</p></div>';
+    return;
+  }
+  reviewStep=0;reviewRecall='';renderReviewStep();
+}
+
+function renderReviewStep(){
+  const c=loadData().find(x=>x.id===reviewQueue[0]);
+  if(!c){nextConcept();return;}
+  const total=reviewQueue.length;
+  const dots=[0,1,2].map(i=>`<div class="dot ${i<reviewStep?'done':i===reviewStep?'active':''}"></div>`).join('');
+  const prog=`<p style="font-size:13px;color:var(--text2);margin-bottom:6px;">${total} concept${total>1?'s':''} à réviser</p>`;
+  const el=document.getElementById('review-content');
+
+  if(reviewStep===0){
+    el.innerHTML=`${prog}<div class="step-dots">${dots}</div>
+    <div class="card">
+      <p style="font-size:20px;font-weight:500;margin-bottom:6px;">${c.title}</p>
+      <div class="wrap" style="margin-bottom:1rem;">${(c.tags||[]).map(renderTagPill).join('')}</div>
+      <p style="font-size:14px;color:var(--text2);margin-bottom:12px;">Rappelle-toi ce concept et écris ce dont tu te souviens.</p>
+      <textarea class="recall-area" id="recall-input" placeholder="Écris ta définition..."></textarea>
+      <button class="btn-p" id="see-def-btn">Voir la définition</button>
+    </div>`;
+    document.getElementById('see-def-btn').addEventListener('click',function(){
+      reviewRecall=document.getElementById('recall-input')?.value||'';
+      reviewStep=1;renderReviewStep();
+    });
+  }else if(reviewStep===1){
+    el.innerHTML=`${prog}<div class="step-dots">${dots}</div>
+    <div class="card">
+      <p style="font-size:20px;font-weight:500;margin-bottom:1rem;">${c.title}</p>
+      <span class="sec-lbl">Ta réponse</span>
+      <p style="font-size:15px;line-height:1.7;color:var(--text2);margin-bottom:1rem;">${reviewRecall||'<em>Rien écrit</em>'}</p>
+      <span class="sec-lbl">Définition de référence</span>
+      <div class="def-box" style="margin-bottom:1rem;">${c.definition}</div>
+      ${c.application?`<span class="sec-lbl">Application concrète</span><div class="app-box" style="margin-bottom:1rem;">${c.application}</div>`:''}
+      ${c.image?`<img class="concept-img" src="${c.image}" style="margin-bottom:1rem;"/>`:''}
+      <span class="sec-lbl">Comment tu t'es souvenu ?</span>
+      <div class="rating-row">
+        <button class="rating-btn r0" id="rate0">Pas du tout</button>
+        <button class="rating-btn r1" id="rate1">Partiellement</button>
+        <button class="rating-btn r2" id="rate2">Bien</button>
+      </div>
+      <button class="btn-s" style="margin-top:10px;width:100%;" id="ai-q-btn">Questions IA</button>
+    </div>`;
+    document.getElementById('rate0').addEventListener('click',()=>rate(0));
+    document.getElementById('rate1').addEventListener('click',()=>rate(1));
+    document.getElementById('rate2').addEventListener('click',()=>rate(2));
+    document.getElementById('ai-q-btn').addEventListener('click',()=>{reviewStep=2;renderReviewStep();});
+  }else{
+    el.innerHTML=`${prog}<div class="step-dots">${dots}</div>
+    <div class="card">
+      <p style="font-size:18px;font-weight:500;margin-bottom:1rem;">${c.title} — Questions</p>
+      <div id="q-area"><p style="color:var(--text2);font-size:14px;font-style:italic;">Génération...</p></div>
+      <button class="btn-s" style="margin-top:1rem;" id="back-btn">Retour</button>
+    </div>`;
+    document.getElementById('back-btn').addEventListener('click',()=>{reviewStep=1;renderReviewStep();});
+    genQuestions(c);
+  }
+}
+
+function rate(r){
+  const data=loadData();
+  const idx=data.findIndex(x=>x.id===reviewQueue[0]);
+  if(idx===-1){nextConcept();return;}
+  let lvl=data[idx].level||0;
+  if(r===2)lvl=Math.min(lvl+1,INTERVALS.length-1);
+  else if(r===0)lvl=Math.max(0,lvl-1);
+  data[idx].level=lvl;data[idx].nextReview=addDays(now(),INTERVALS[lvl]);data[idx].lastReview=now();
+  saveData(data);nextConcept();
+}
+
+function nextConcept(){
+  reviewQueue.shift();reviewStep=0;reviewRecall='';updateBadge();
+  if(!reviewQueue.length){
+    document.getElementById('review-content').innerHTML='<div class="empty" style="padding:3rem 0;"><p style="font-size:16px;font-weight:500;margin-bottom:8px;">Session terminée</p><p>Tous les concepts révisés.</p></div>';
+    return;
+  }
+  renderReviewStep();
+}
+
+async function genQuestions(concept){
+  const area=document.getElementById('q-area');
+  const key=getGeminiKey();
+  if(!key){if(area)area.innerHTML='<p style="color:var(--danger);font-size:14px;">Configure ta clé Gemini dans Réglages.</p>';return;}
+  const prompt=`Tu es un assistant pédagogique. Génère 3 questions de compréhension sur ce concept pour aider un étudiant à l'ancrer en mémoire. Va au-delà de la définition : liens avec d'autres concepts, applications, nuances.\n\nConcept : ${concept.title}\nDéfinition : ${concept.definition}\n${concept.application?'Application : '+concept.application:''}\n\nRéponds UNIQUEMENT en JSON valide sans markdown :\n{"questions":["q1","q2","q3"]}`;
+  try{
+    const text=await callGemini(prompt);
+    const clean=text.replace(/```json|```/g,'').trim();
+    const parsed=JSON.parse(clean);
+    if(!area)return;
+    area.innerHTML=parsed.questions.map((q,i)=>`
+      <div style="margin-bottom:1.25rem;">
+        <p style="font-size:12px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.06em;">Question ${i+1}</p>
+        <p style="font-size:15px;line-height:1.7;">${q}</p>
+        <textarea class="field" style="margin-top:8px;min-height:60px;" placeholder="Ta réponse..."></textarea>
+      </div>${i<2?'<hr/>':''}`).join('');
+  }catch(e){
+    if(area)area.innerHTML=`<p style="color:var(--danger);font-size:14px;">${e.message==='no_key'?'Configure ta clé Gemini dans Réglages.':'Erreur : '+e.message}</p>`;
+  }
+}
+
+function parseMarkdown(){
+  const md=document.getElementById('f-markdown').value;
+  if(!md.trim())return;
+  const parsed=parseMdContent(md,'');
+  if(parsed.title)document.getElementById('f-title').value=parsed.title;
+  if(parsed.definition)document.getElementById('f-definition').value=parsed.definition;
+  if(parsed.application)document.getElementById('f-application').value=parsed.application;
+  if(parsed.source)document.getElementById('f-source').value=parsed.source;
+  if(parsed.tags.length){selectedTags=new Set(parsed.tags);renderTagSelector();}
+}
+
+updateBadge();renderDashboard();
+</script>
+</body>
+</html>
