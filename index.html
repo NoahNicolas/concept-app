@@ -678,3 +678,14 @@ async function genQuestions(concept){
     });
   }catch(e){if(area)area.innerHTML='<p style="color:var(--danger);font-size:14px;">Erreur : '+e.message+'</p>';}
 }
+
+
+
+(async function init(){
+  showLoading('Chargement...');
+  try{await getCustomTags();await getConcepts();}finally{hideLoading();}
+  await updateBadge();await renderDashboard();
+})();
+</script>
+</body>
+</html>
