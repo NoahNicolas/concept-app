@@ -879,7 +879,9 @@ function renderImportPreview(){
         <div style="flex:1;min-width:0;">
           <div style="font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.title}</div>
           <div style="font-size:12px;color:var(--text3);margin-top:2px;">${r.filename}</div>
-          ${r.tags&&r.tags.length?`<div style="margin-top:4px;">${r.tags.map(renderTagPill).join('')}</div>`:''}
+          ${r.status!=='excluded'?`<div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;">
+            ${getAllTags().map(t=>`<span onclick="toggleImportTag(${i},'${t}')" style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;cursor:pointer;border:0.5px solid ${(r.tags||[]).includes(t)?'transparent':'var(--border2)'};background:${(r.tags||[]).includes(t)?(TAG_BG[t]||'var(--bg2)'):'transparent'};color:${(r.tags||[]).includes(t)?(TAG_COLOR[t]||'var(--text)'):'var(--text3)'};">${cap(t)}</span>`).join('')}
+          </div>`:''}
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
           ${r.status==='ok'?'<span style="font-size:12px;color:var(--success);">✓</span>':''}
@@ -915,6 +917,14 @@ function renderImportPreview(){
   const btn=document.getElementById('confirm-import-btn');
   btn.disabled=!hasReady;btn.style.opacity=hasReady?'1':'0.4';
   document.getElementById('import-actions').classList.remove('hidden');
+}
+
+function toggleImportTag(i,tag){
+  if(!importQueue[i].tags)importQueue[i].tags=[];
+  const idx=importQueue[i].tags.indexOf(tag);
+  if(idx!==-1)importQueue[i].tags.splice(idx,1);
+  else importQueue[i].tags.push(tag);
+  renderImportPreview();
 }
 
 function excludeItem(i){importQueue[i].status='excluded';importQueue[i].miniOpen=false;renderImportPreview();}
