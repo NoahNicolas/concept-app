@@ -56,9 +56,13 @@ hr{border:none;border-top:0.5px solid var(--border);margin:1rem 0;}
 .dot.active{background:var(--text);}
 .dot.done{background:var(--text2);}
 .recall-area{width:100%;min-height:130px;font-size:15px;line-height:1.7;padding:12px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);font-family:inherit;resize:vertical;margin-bottom:1rem;display:block;}
-.rating-row{display:flex;gap:8px;margin-top:1rem;}
-.rating-btn{flex:1;padding:12px 8px;border-radius:var(--radius);border:0.5px solid var(--border2);background:transparent;cursor:pointer;font-size:13px;text-align:center;}
-.r0{border-color:#E24B4A;color:#E24B4A;}.r1{border-color:#BA7517;color:#BA7517;}.r2{border-color:#639922;color:#639922;}
+.rating-row{display:flex;gap:10px;margin-top:1rem;}
+.rating-btn{flex:1;padding:16px 8px;border-radius:var(--radius);border:1.5px solid var(--border2);background:transparent;cursor:pointer;font-size:13px;font-weight:500;text-align:center;transition:transform 0.1s;}
+.rating-btn:active{transform:scale(0.96);}
+.r0{border-color:#E24B4A;color:#E24B4A;background:#fff5f5;}.r1{border-color:#BA7517;color:#BA7517;background:#fffaf0;}.r2{border-color:#639922;color:#639922;background:#f4faf0;}
+@media(prefers-color-scheme:dark){.r0{background:#2a1010;}.r1{background:#2a1f08;}.r2{background:#0e1f0e;}}
+@keyframes flipIn{from{transform:rotateY(-90deg);opacity:0;}to{transform:rotateY(0deg);opacity:1;}}
+.flip-reveal{animation:flipIn 0.28s ease-out;}
 .api-bar{background:var(--bg2);border-radius:var(--radius);padding:10px 14px;margin-bottom:1rem;display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
 .api-bar input{flex:1;min-width:120px;background:transparent;border:none;font-size:13px;color:var(--text);font-family:inherit;outline:none;margin:0;padding:0;}
 .tag-inp{padding:5px 10px;border-radius:20px;border:0.5px solid var(--border2);background:var(--bg);color:var(--text);font-size:13px;width:120px;outline:none;font-family:inherit;}
@@ -173,6 +177,13 @@ hr{border:none;border-top:0.5px solid var(--border);margin:1rem 0;}
         <button class="btn-xs-p" id="save-custom-theme-btn">OK</button>
       </div>
       <hr/>
+      <span class="lbl">Nouveaux concepts par jour</span>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:10px;">Limite les nouveaux concepts par session — les révisions dues s'ajoutent toujours par-dessus.</p>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:0.5rem;">
+        <input class="field" type="number" id="daily-new-input" min="1" max="50" style="margin-bottom:0;width:80px;"/>
+        <button class="btn-xs-p" id="save-daily-new-btn">Enregistrer</button>
+      </div>
+      <hr/>
       <span class="lbl" style="color:var(--danger);">Zone de danger</span>
       <p style="font-size:13px;color:var(--text2);margin-bottom:10px;">Supprimer tous les concepts. Irréversible.</p>
       <button class="btn-d" id="reset-all-btn">Supprimer tous les concepts</button>
@@ -227,13 +238,28 @@ function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
 function getGeminiKey(){return localStorage.getItem('gemini_key')||'';}
 function getTheme(){return localStorage.getItem('insp_theme')||'';}
 function setTheme(t){localStorage.setItem('insp_theme',t);}
+function getDailyNewLimit(){return parseInt(localStorage.getItem('daily_new_limit')||'5');}
+async function logReviewDay(){try{await sb('review_log',{method:'POST',headers:{'Prefer':'resolution=ignore-duplicates'},body:JSON.stringify({review_date:now()})});}catch(e){}}
+async function getStreak(){
+  try{
+    const rows=await sb('review_log?select=review_date&order=review_date.desc&limit=400');
+    if(!rows||!rows.length)return 0;
+    const dateSet=new Set(rows.map(r=>r.review_date));
+    const today=now(),yesterday=addDays(today,-1);
+    let start=dateSet.has(today)?today:dateSet.has(yesterday)?yesterday:null;
+    if(!start)return 0;
+    let streak=0,check=start;
+    while(dateSet.has(check)){streak++;check=addDays(check,-1);}
+    return streak;
+  }catch(e){return 0;}
+}
 function tagStyle(t,sel){const tl=t.toLowerCase();if(sel)return`background:${TAG_BG[tl]||'#eee'};color:${TAG_COLOR[tl]||'#333'};border-color:${TAG_BORDER[tl]||'#ccc'};`;return'';}
 function tagPill(t){const tl=t.toLowerCase();return`<span class="tag" style="background:${TAG_BG[tl]||'var(--bg2)'};color:${TAG_COLOR[tl]||'var(--text2)'};">${cap(t)}</span>`;}
 function showLoading(msg='Chargement...'){let el=document.getElementById('lo');if(!el){el=document.createElement('div');el.id='lo';el.className='loading-overlay';el.innerHTML=`<div class="loading-box">${msg}</div>`;document.body.appendChild(el);}}
 function hideLoading(){const el=document.getElementById('lo');if(el)el.remove();}
 
 let currentView='dashboard',currentId=null,editingId=null;
-let reviewQueue=[],reviewStep=0,_cardFlipped=false;
+let reviewQueue=[],reviewStep=0,_cardFlipped=false,_sessionTotal=0;
 let _preloadedQuestions={};
 let selectedTags=new Set(),pendingImage='',importQueue=[];
 let _currentInspConcept=null,currentFilter='all';
@@ -251,7 +277,7 @@ async function showView(v){
   if(v==='review'){if(!reviewQueue.length)await startReview();else await renderReviewStep();}
   if(v==='add'&&!editingId)resetForm();
   if(v==='import')resetImport();
-  if(v==='settings'){const k=getGeminiKey();if(k)document.getElementById('gemini-key-input').value=k;renderThemeChips();await renderCustomTagsList();}
+  if(v==='settings'){const k=getGeminiKey();if(k)document.getElementById('gemini-key-input').value=k;document.getElementById('daily-new-input').value=getDailyNewLimit();renderThemeChips();await renderCustomTagsList();}
   await updateBadge();
 }
 
@@ -290,11 +316,12 @@ async function commitNewTag(val){
 async function renderDashboard(){
   const data=await getConcepts();const due=data.filter(isDue);
   const mastered=data.filter(c=>c.level>=5).length;const reviewed=data.filter(c=>c.lastReview).length;
+  const streak=await getStreak();
   document.getElementById('stat-grid').innerHTML=`
     <div class="stat-card"><div class="stat-num">${data.length}</div><div class="stat-lbl">Concepts total</div></div>
     <div class="stat-card"><div class="stat-num" style="color:var(--danger);">${due.length}</div><div class="stat-lbl">À réviser aujourd'hui</div></div>
     <div class="stat-card"><div class="stat-num" style="color:var(--success);">${mastered}</div><div class="stat-lbl">Maîtrisés (niv. 5+)</div></div>
-    <div class="stat-card"><div class="stat-num">${reviewed}</div><div class="stat-lbl">Déjà révisés</div></div>`;
+    <div class="stat-card"><div class="stat-num" style="color:#E67E22;">${streak}</div><div class="stat-lbl">Jours consécutifs</div></div>`;
   renderInspiration();
   if(due.length){
     document.getElementById('due-section').innerHTML=`
@@ -402,7 +429,7 @@ document.getElementById('overlay').addEventListener('click',function(e){if(e.tar
 document.getElementById('modal-review-btn').addEventListener('click',async function(){
   if(!currentId)return;
   const data=await getConcepts();const c=data.find(x=>x.id===currentId);
-  closeModal();reviewQueue=[currentId];reviewStep=getGeminiKey()?0:1;_cardFlipped=false;
+  closeModal();reviewQueue=[currentId];_sessionTotal=1;reviewStep=getGeminiKey()?0:1;_cardFlipped=false;
   if(c&&getGeminiKey()&&!_preloadedQuestions[c.id])_preloadedQuestions[c.id]=genQuestionsPreload(c);
   await showView('review');
 });
@@ -452,6 +479,7 @@ function resetForm(){
 }
 
 document.getElementById('save-gemini-btn').addEventListener('click',function(){const v=document.getElementById('gemini-key-input').value.trim();if(v){localStorage.setItem('gemini_key',v);alert('Clé API Gemini enregistrée.');}});
+document.getElementById('save-daily-new-btn').addEventListener('click',function(){const v=parseInt(document.getElementById('daily-new-input').value);if(v>0&&v<=50){localStorage.setItem('daily_new_limit',String(v));alert(v+' nouveaux concepts par jour.');}});
 document.getElementById('save-custom-theme-btn').addEventListener('click',async function(){const v=document.getElementById('custom-theme-input').value.trim();if(v){await selectTheme(v);document.getElementById('custom-theme-input').value='';}});
 document.getElementById('reset-all-btn').addEventListener('click',async function(){
   if(!confirm('Supprimer TOUS les concepts ? Irréversible.'))return;
@@ -601,7 +629,12 @@ document.getElementById('confirm-import-btn').addEventListener('click',async fun
 document.getElementById('reset-import-btn').addEventListener('click',resetImport);
 
 async function startReview(){
-  const data=await getConcepts();reviewQueue=data.filter(isDue).map(c=>c.id);
+  const data=await getConcepts();const today=now();const limit=getDailyNewLimit();
+  const due=data.filter(c=>c.nextReview&&c.nextReview<=today);
+  const newC=data.filter(c=>!c.nextReview);
+  due.sort((a,b)=>{const al=a.level||0,bl=b.level||0;if(al!==bl)return al-bl;return a.nextReview<b.nextReview?-1:1;});
+  reviewQueue=[...due,...newC.slice(0,limit)].map(c=>c.id);
+  _sessionTotal=reviewQueue.length;
   if(!reviewQueue.length){document.getElementById('review-content').innerHTML='<div class="empty" style="padding:3rem 0;"><p style="font-size:16px;font-weight:500;margin-bottom:8px;">Rien à réviser aujourd\'hui</p><p>Tous tes concepts sont à jour.</p></div>';return;}
   reviewStep=getGeminiKey()?0:1;_cardFlipped=false;
   const firstC=data.find(x=>x.id===reviewQueue[0]);
@@ -611,11 +644,22 @@ async function startReview(){
 async function renderReviewStep(){
   const data=await getConcepts();const c=data.find(x=>x.id===reviewQueue[0]);
   if(!c){await nextConcept();return;}
-  const dots=[0,1,2].map(i=>`<div class="dot ${i<reviewStep?'done':i===reviewStep?'active':''}"></div>`).join('');
-  const prog=`<p style="font-size:13px;color:var(--text2);margin-bottom:6px;">${reviewQueue.length} concept${reviewQueue.length>1?'s':''} à réviser</p>`;
+  const completed=Math.max(0,(_sessionTotal||1)-reviewQueue.length);
+  const total=_sessionTotal||1;
+  const pct=Math.round(completed/total*100);
+  const stepLabel=reviewStep===0?'Questions IA':reviewStep===1?'Flip card':'Auto-évaluation';
+  const prog=`<div style="margin-bottom:1.5rem;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <span style="font-size:13px;font-weight:500;color:var(--text2);">${completed+1} <span style="font-weight:400;color:var(--text3);">/ ${total}</span></span>
+      <span style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;">${stepLabel}</span>
+    </div>
+    <div style="height:3px;background:var(--border);border-radius:2px;overflow:hidden;">
+      <div style="height:3px;background:var(--text2);border-radius:2px;width:${pct}%;"></div>
+    </div>
+  </div>`;
   const el=document.getElementById('review-content');
   if(reviewStep===0){
-    el.innerHTML=`${prog}<div class="step-dots">${dots}</div><div class="card">
+    el.innerHTML=`${prog}<div class="card">
       <p style="font-size:20px;font-weight:500;margin-bottom:1.25rem;">${c.title}</p>
       <div id="q-area"><p style="color:var(--text2);font-size:14px;font-style:italic;">Génération des questions...</p></div>
     </div>`;
@@ -654,43 +698,51 @@ async function renderReviewStep(){
     });
   }else if(reviewStep===1){
     if(!_cardFlipped){
-      el.innerHTML=`${prog}<div class="step-dots">${dots}</div><div class="card" style="text-align:center;padding:2.5rem 1.25rem;">
+      el.innerHTML=`${prog}<div class="card" style="text-align:center;padding:2.5rem 1.25rem;">
         <p style="font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:var(--text3);margin-bottom:1.5rem;">Flip card</p>
         <p style="font-size:30px;font-weight:600;line-height:1.3;margin-bottom:2rem;">${c.title}</p>
         <p style="font-size:14px;color:var(--text2);margin-bottom:1.5rem;">Prends le temps de te rappeler la définition, puis retourne la carte.</p>
-        <button class="btn-p" id="flip-btn">Retourner la carte</button>
+        <button class="btn-p" id="flip-btn" style="width:100%;">Retourner la carte</button>
+        ${getGeminiKey()?'<button class="btn-s" id="back-btn" style="width:100%;margin-top:0.75rem;">← Retour aux questions</button>':''}
       </div>`;
       document.getElementById('flip-btn').addEventListener('click',()=>{_cardFlipped=true;renderReviewStep();});
+      if(getGeminiKey())document.getElementById('back-btn').addEventListener('click',()=>{reviewStep=0;renderReviewStep();});
     }else{
-      el.innerHTML=`${prog}<div class="step-dots">${dots}</div><div class="card">
+      el.innerHTML=`${prog}<div class="card flip-reveal">
         <p style="font-size:20px;font-weight:500;margin-bottom:1.25rem;">${c.title}</p>
         <span class="sec-lbl">Définition</span><div class="def-box" style="margin-bottom:1rem;">${c.definition}</div>
         ${c.application?`<span class="sec-lbl">Application concrète</span><div class="app-box" style="margin-bottom:1rem;">${c.application}</div>`:''}
         ${c.image?`<img class="concept-img" src="${c.image}" style="margin-bottom:1rem;"/>`:''}
         <button class="btn-p" style="width:100%;margin-top:0.5rem;" id="eval-btn">S'auto-évaluer</button>
+        <button class="btn-s" id="back-btn" style="width:100%;margin-top:0.75rem;">← Retour</button>
       </div>`;
       document.getElementById('eval-btn').addEventListener('click',()=>{reviewStep=2;renderReviewStep();});
+      document.getElementById('back-btn').addEventListener('click',()=>{_cardFlipped=false;renderReviewStep();});
     }
   }else{
-    el.innerHTML=`${prog}<div class="step-dots">${dots}</div><div class="card">
+    const lvl=c.level||0;
+    const r0next=INTERVALS[Math.max(0,lvl-1)],r1next=INTERVALS[lvl],r2next=INTERVALS[Math.min(lvl+1,INTERVALS.length-1)];
+    el.innerHTML=`${prog}<div class="card">
       <p style="font-size:20px;font-weight:500;margin-bottom:0.5rem;">${c.title}</p>
-      <p style="font-size:14px;color:var(--text2);margin-bottom:1.5rem;">Comment tu t'en es souvenu ?</p>
+      <p style="font-size:14px;color:var(--text2);margin-bottom:1.25rem;">Comment tu t'en es souvenu ?</p>
       <div class="rating-row">
-        <button class="rating-btn r0" id="rate0">Pas du tout</button>
-        <button class="rating-btn r1" id="rate1">Partiellement</button>
-        <button class="rating-btn r2" id="rate2">Bien</button>
+        <button class="rating-btn r0" id="rate0"><div style="font-size:20px;font-weight:700;margin-bottom:4px;">✗</div><div>Pas du tout</div><div style="font-size:11px;margin-top:5px;opacity:0.7;">dans ${r0next}j</div></button>
+        <button class="rating-btn r1" id="rate1"><div style="font-size:20px;font-weight:700;margin-bottom:4px;">~</div><div>Partiellement</div><div style="font-size:11px;margin-top:5px;opacity:0.7;">dans ${r1next}j</div></button>
+        <button class="rating-btn r2" id="rate2"><div style="font-size:20px;font-weight:700;margin-bottom:4px;">✓</div><div>Bien</div><div style="font-size:11px;margin-top:5px;opacity:0.7;">dans ${r2next}j</div></button>
       </div>
+      <button class="btn-s" id="back-btn" style="width:100%;margin-top:1rem;">← Retour</button>
     </div>`;
     document.getElementById('rate0').addEventListener('click',async()=>await rate(0));
     document.getElementById('rate1').addEventListener('click',async()=>await rate(1));
     document.getElementById('rate2').addEventListener('click',async()=>await rate(2));
+    document.getElementById('back-btn').addEventListener('click',()=>{reviewStep=1;_cardFlipped=true;renderReviewStep();});
   }
 }
 async function rate(r){
   const data=await getConcepts();const c=data.find(x=>x.id===reviewQueue[0]);if(!c)return;
   let lvl=c.level||0;if(r===2)lvl=Math.min(lvl+1,INTERVALS.length-1);else if(r===0)lvl=Math.max(0,lvl-1);
   c.level=lvl;c.nextReview=addDays(now(),INTERVALS[lvl]);c.lastReview=now();
-  await updateConceptDB(c);await nextConcept();
+  await updateConceptDB(c);logReviewDay();await nextConcept();
 }
 async function nextConcept(){
   reviewQueue.shift();reviewStep=0;_cardFlipped=false;await updateBadge();
