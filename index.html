@@ -710,10 +710,9 @@ async function genQuestionsPreload(concept){
     'Définition : '+concept.definition,
     concept.application?'Application : '+concept.application:'',
     '',
-    'Pour chaque question, fournis une réponse de référence concise (2-3 phrases).',
-    'IMPORTANT : Dans tes réponses JSON, remplace toutes les apostrophes par des espaces.',
+    'Pour chaque question, fournis une réponse de référence courte (1-2 phrases max). Garde les accents et apostrophes.',
     '',
-    'Réponds UNIQUEMENT en JSON valide sans markdown :',
+    'Réponds UNIQUEMENT en JSON valide sans markdown, sans caractères de contrôle :',
     '{"items":[{"question":"question 1","answer":"reponse 1"},{"question":"question 2","answer":"reponse 2"},{"question":"question 3","answer":"reponse 3"}]}'
   ].join('\n');
   const text=await callGemini(promptText);
