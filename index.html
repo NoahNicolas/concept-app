@@ -233,7 +233,8 @@ function showLoading(msg='Chargement...'){let el=document.getElementById('lo');i
 function hideLoading(){const el=document.getElementById('lo');if(el)el.remove();}
 
 let currentView='dashboard',currentId=null,editingId=null;
-let reviewQueue=[],reviewStep=0,reviewRecall='';
+let reviewQueue=[],reviewStep=0,_cardFlipped=false;
+let _preloadedQuestions={};
 let selectedTags=new Set(),pendingImage='',importQueue=[];
 let _currentInspConcept=null,currentFilter='all';
 
@@ -247,7 +248,7 @@ async function showView(v){
   currentView=v;
   if(v==='dashboard')await renderDashboard();
   if(v==='library'){renderFilterChips();await renderLibrary();}
-  if(v==='review'&&!reviewQueue.length)await startReview();
+  if(v==='review'){if(!reviewQueue.length)await startReview();else await renderReviewStep();}
   if(v==='add'&&!editingId)resetForm();
   if(v==='import')resetImport();
   if(v==='settings'){const k=getGeminiKey();if(k)document.getElementById('gemini-key-input').value=k;renderThemeChips();await renderCustomTagsList();}
@@ -324,7 +325,7 @@ async function renderInspiration(){
   if(!theme){el.innerHTML=`<div class="insp-card"><div style="font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:#7F77DD;margin-bottom:8px;">Inspiration du jour</div><p class="insp-body">Choisis un thème dans <strong>Réglages</strong>.</p><button class="btn-xs" style="margin-top:12px;" onclick="showView('settings')">Choisir un thème</button></div>`;return;}
   const today=now(),cacheDate=localStorage.getItem('insp_cache_date'),cacheData=localStorage.getItem('insp_cache');
   if(cacheDate===today&&cacheData){
-    if(cacheData==='__error__'){el.innerHTML=`<div class="insp-card"><div style="font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:#7F77DD;margin-bottom:8px;">Inspiration — ${theme}</div><p class="insp-body" style="margin-bottom:10px;">Quota Gemini atteint. Réessaie demain.</p><button class="btn-xs" id="refresh-insp-btn">Réessayer</button></div>`;return;}
+    if(cacheData==='__error__'){el.innerHTML=`<div class="insp-card"><div style="font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:#7F77DD;margin-bottom:8px;">Inspiration — ${theme}</div><p class="insp-body" style="margin-bottom:10px;">Quota Gemini atteint. Réessaie demain.</p><button class="btn-xs" id="refresh-insp-btn">Réessayer</button></div>`;document.getElementById('refresh-insp-btn').addEventListener('click',function(){localStorage.removeItem('insp_cache_date');renderInspiration();});return;}
     try{renderInspCard(JSON.parse(cacheData),theme);return;}catch(e){}
   }
   const key=getGeminiKey();
@@ -338,7 +339,7 @@ async function renderInspiration(){
     renderInspCard(parsed,theme);
   }catch(e){
     localStorage.setItem('insp_cache','__error__');localStorage.setItem('insp_cache_date',today);
-    el.innerHTML=`<div class="insp-card"><p style="color:var(--danger);font-size:14px;margin-bottom:8px;">${e.message&&e.message.includes('429')?'Quota Gemini atteint.':'Erreur. Vérifie ta clé Gemini.'}</p><button class="btn-xs" id="refresh-insp-btn">Réessayer</button></div>`;
+    el.innerHTML=`<div class="insp-card"><p style="color:var(--danger);font-size:14px;margin-bottom:8px;">${e.message&&e.message.includes('429')?'Quota Gemini atteint.':'Erreur. Vérifie ta clé Gemini.'}</p><button class="btn-xs" id="refresh-insp-btn">Réessayer</button></div>`;document.getElementById('refresh-insp-btn').addEventListener('click',function(){localStorage.removeItem('insp_cache_date');renderInspiration();});
   }
 }
 function renderInspCard(c,theme){
@@ -351,6 +352,21 @@ function renderInspCard(c,theme){
     ${c.source?`<div style="font-size:12px;color:#7F77DD;margin-bottom:12px;">Source : ${c.source}</div>`:''}
     <div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn-xs-p" id="add-insp-btn">+ Ajouter à ma base</button><button class="btn-xs" id="refresh-insp-btn">Autre concept</button></div>
   </div>`;
+  document.getElementById('add-insp-btn').addEventListener('click',function(){
+    document.getElementById('f-title').value=c.title||'';
+    document.getElementById('f-definition').value=c.definition||'';
+    document.getElementById('f-application').value=c.application||'';
+    document.getElementById('f-source').value=c.source||'';
+    selectedTags=new Set();pendingImage='';editingId=null;
+    document.getElementById('img-preview').style.display='none';
+    document.getElementById('form-title-label').textContent='Ajouter un concept';
+    document.getElementById('add-btn').textContent='Ajouter le concept';
+    document.getElementById('cancel-edit-btn').classList.add('hidden');
+    renderTagSelector();showView('add');
+  });
+  document.getElementById('refresh-insp-btn').addEventListener('click',function(){
+    localStorage.removeItem('insp_cache_date');renderInspiration();
+  });
 }
 
 async function renderLibrary(){
@@ -383,7 +399,13 @@ async function openModal(id){
 }
 function closeModal(){document.getElementById('modal').classList.add('hidden');}
 document.getElementById('overlay').addEventListener('click',function(e){if(e.target===this)closeModal();});
-document.getElementById('modal-review-btn').addEventListener('click',async function(){if(!currentId)return;closeModal();reviewQueue=[currentId];reviewStep=0;reviewRecall='';await showView('review');});
+document.getElementById('modal-review-btn').addEventListener('click',async function(){
+  if(!currentId)return;
+  const data=await getConcepts();const c=data.find(x=>x.id===currentId);
+  closeModal();reviewQueue=[currentId];reviewStep=0;_cardFlipped=false;
+  if(c&&getGeminiKey()&&!_preloadedQuestions[c.id])_preloadedQuestions[c.id]=genQuestionsPreload(c);
+  await showView('review');
+});
 document.getElementById('modal-edit-btn').addEventListener('click',async function(){
   if(!currentId)return;const data=await getConcepts();const c=data.find(x=>x.id===currentId);if(!c)return;
   editingId=currentId;closeModal();
@@ -502,7 +524,7 @@ async function processFiles(files){
   importQueue=[];const existing=await getConcepts();const existingTitles=new Set(existing.map(c=>c.title.toLowerCase()));
   document.getElementById('import-preview').innerHTML=`<p style="font-size:13px;color:var(--text2);margin-bottom:10px;">Analyse de ${files.length} fichier${files.length>1?'s':''}...</p>`;
   let processed=0;const results=[];
-  files.forEach(file=>{const reader=new FileReader();reader.onload=function(e){const parsed=parseMdContent(e.target.result,file.name);let status='ok',reason='';if(!parsed.definition){status='err';reason='Section Définition introuvable';}else if(existingTitles.has(parsed.title.toLowerCase())){status='skip';}results.push({...parsed,filename:file.name,status,reason,miniOpen:false,miniDef:'',miniApp:'',miniSrc:'',miniTags:new Set(parsed.tags)});processed++;if(processed===files.length){results.sort((a,b)=>a.filename.localeCompare(b.filename));importQueue=results;renderImportPreview();}};reader.readAsText(file);});
+  files.forEach(file=>{const reader=new FileReader();reader.onload=function(e){try{const parsed=parseMdContent(e.target.result,file.name);let status='ok',reason='';if(!parsed.definition){status='err';reason='Section Définition introuvable';}else if(existingTitles.has(parsed.title.toLowerCase())){status='skip';}results.push({...parsed,filename:file.name,status,reason,miniOpen:false,miniDef:'',miniApp:'',miniSrc:'',miniTags:new Set(parsed.tags)});}catch(err){results.push({title:file.name.replace(/\.md$/,''),definition:'',application:'',source:'',tags:[],filename:file.name,status:'err',reason:'Erreur de lecture',miniOpen:false,miniDef:'',miniApp:'',miniSrc:'',miniTags:new Set()});}processed++;if(processed===files.length){results.sort((a,b)=>a.filename.localeCompare(b.filename));importQueue=results;renderImportPreview();}};reader.onerror=function(){results.push({title:file.name.replace(/\.md$/,''),definition:'',application:'',source:'',tags:[],filename:file.name,status:'err',reason:'Fichier illisible',miniOpen:false,miniDef:'',miniApp:'',miniSrc:'',miniTags:new Set()});processed++;if(processed===files.length){results.sort((a,b)=>a.filename.localeCompare(b.filename));importQueue=results;renderImportPreview();}};reader.readAsText(file);});
 }
 
 function renderImportPreview(){
@@ -581,7 +603,10 @@ document.getElementById('reset-import-btn').addEventListener('click',resetImport
 async function startReview(){
   const data=await getConcepts();reviewQueue=data.filter(isDue).map(c=>c.id);
   if(!reviewQueue.length){document.getElementById('review-content').innerHTML='<div class="empty" style="padding:3rem 0;"><p style="font-size:16px;font-weight:500;margin-bottom:8px;">Rien à réviser aujourd\'hui</p><p>Tous tes concepts sont à jour.</p></div>';return;}
-  reviewStep=0;reviewRecall='';await renderReviewStep();
+  reviewStep=0;_cardFlipped=false;
+  const firstC=data.find(x=>x.id===reviewQueue[0]);
+  if(firstC&&getGeminiKey()&&!_preloadedQuestions[firstC.id])_preloadedQuestions[firstC.id]=genQuestionsPreload(firstC);
+  await renderReviewStep();
 }
 async function renderReviewStep(){
   const data=await getConcepts();const c=data.find(x=>x.id===reviewQueue[0]);
@@ -591,37 +616,74 @@ async function renderReviewStep(){
   const el=document.getElementById('review-content');
   if(reviewStep===0){
     el.innerHTML=`${prog}<div class="step-dots">${dots}</div><div class="card">
-      <p style="font-size:20px;font-weight:500;margin-bottom:6px;">${c.title}</p>
-      <div class="wrap" style="margin-bottom:1rem;">${(c.tags||[]).map(tagPill).join('')}</div>
-      <p style="font-size:14px;color:var(--text2);margin-bottom:12px;">Rappelle-toi ce concept et écris ce dont tu te souviens.</p>
-      <textarea class="recall-area" id="recall-input" placeholder="Écris ta définition..."></textarea>
-      <button class="btn-p" id="see-def-btn">Voir la définition</button></div>`;
-    document.getElementById('see-def-btn').addEventListener('click',function(){reviewRecall=document.getElementById('recall-input')?.value||'';reviewStep=1;renderReviewStep();});
+      <p style="font-size:20px;font-weight:500;margin-bottom:1.25rem;">${c.title}</p>
+      <div id="q-area"><p style="color:var(--text2);font-size:14px;font-style:italic;">Génération des questions...</p></div>
+    </div>`;
+    let items=null;
+    try{
+      if(!_preloadedQuestions[c.id]&&getGeminiKey())_preloadedQuestions[c.id]=genQuestionsPreload(c);
+      if(_preloadedQuestions[c.id])items=await _preloadedQuestions[c.id];
+    }catch(e){}
+    const qArea=document.getElementById('q-area');if(!qArea)return;
+    if(!items){
+      const noKey=!getGeminiKey();
+      qArea.innerHTML=(noKey?'<p style="color:var(--danger);font-size:14px;">Configure ta clé Gemini dans Réglages.</p>':'<p style="color:var(--danger);font-size:14px;">Erreur de génération des questions.</p>')
+        +'<button class="btn-s" style="margin-top:1rem;" id="skip-q-btn">Passer les questions →</button>';
+      document.getElementById('skip-q-btn')?.addEventListener('click',()=>{reviewStep=1;_cardFlipped=false;renderReviewStep();});
+      return;
+    }
+    qArea.innerHTML=items.map((item,i)=>`
+      <div style="margin-bottom:1.25rem;">
+        <p style="font-size:12px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.06em;">Question ${i+1}</p>
+        <p style="font-size:15px;line-height:1.7;margin-bottom:8px;">${item.question}</p>
+        <textarea class="field" id="qa_${i}" style="min-height:70px;" placeholder="Ta réponse..."></textarea>
+      </div>${i<items.length-1?'<hr/>':''}`).join('')
+    +'<button class="btn-p" id="reveal-answers-btn" style="width:100%;margin-top:1rem;opacity:0.4;" disabled>Voir les réponses de référence</button>'
+    +'<div id="answers-reveal" style="display:none;margin-top:1.5rem;"></div>'
+    +'<button class="btn-p hidden" id="continue-btn" style="width:100%;margin-top:1rem;">Continuer →</button>';
+    window._qaItems=items;
+    const checkFilled=()=>{const all=items.every((_,i)=>(document.getElementById('qa_'+i)?.value||'').trim().length>0);const btn=document.getElementById('reveal-answers-btn');if(btn){btn.disabled=!all;btn.style.opacity=all?'1':'0.4';}};
+    items.forEach((_,i)=>document.getElementById('qa_'+i)?.addEventListener('input',checkFilled));
+    document.getElementById('reveal-answers-btn').addEventListener('click',function(){
+      let ansHtml='<p style="font-size:13px;font-weight:500;color:var(--text2);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.06em;">Réponses de référence</p>';
+      (window._qaItems||[]).forEach((item,i)=>{ansHtml+=`<div style="margin-bottom:1rem;"><p style="font-size:12px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.06em;">Question ${i+1}</p><div class="def-box">${item.answer}</div></div>`;});
+      document.getElementById('answers-reveal').innerHTML=ansHtml;document.getElementById('answers-reveal').style.display='block';
+      this.style.display='none';
+      const cb=document.getElementById('continue-btn');cb.classList.remove('hidden');
+      cb.addEventListener('click',()=>{reviewStep=1;_cardFlipped=false;renderReviewStep();});
+    });
   }else if(reviewStep===1){
+    if(!_cardFlipped){
+      el.innerHTML=`${prog}<div class="step-dots">${dots}</div><div class="card" style="text-align:center;padding:2.5rem 1.25rem;">
+        <p style="font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:var(--text3);margin-bottom:1.5rem;">Flip card</p>
+        <p style="font-size:30px;font-weight:600;line-height:1.3;margin-bottom:2rem;">${c.title}</p>
+        <p style="font-size:14px;color:var(--text2);margin-bottom:1.5rem;">Prends le temps de te rappeler la définition, puis retourne la carte.</p>
+        <button class="btn-p" id="flip-btn">Retourner la carte</button>
+      </div>`;
+      document.getElementById('flip-btn').addEventListener('click',()=>{_cardFlipped=true;renderReviewStep();});
+    }else{
+      el.innerHTML=`${prog}<div class="step-dots">${dots}</div><div class="card">
+        <p style="font-size:20px;font-weight:500;margin-bottom:1.25rem;">${c.title}</p>
+        <span class="sec-lbl">Définition</span><div class="def-box" style="margin-bottom:1rem;">${c.definition}</div>
+        ${c.application?`<span class="sec-lbl">Application concrète</span><div class="app-box" style="margin-bottom:1rem;">${c.application}</div>`:''}
+        ${c.image?`<img class="concept-img" src="${c.image}" style="margin-bottom:1rem;"/>`:''}
+        <button class="btn-p" style="width:100%;margin-top:0.5rem;" id="eval-btn">S'auto-évaluer</button>
+      </div>`;
+      document.getElementById('eval-btn').addEventListener('click',()=>{reviewStep=2;renderReviewStep();});
+    }
+  }else{
     el.innerHTML=`${prog}<div class="step-dots">${dots}</div><div class="card">
-      <p style="font-size:20px;font-weight:500;margin-bottom:1rem;">${c.title}</p>
-      <span class="sec-lbl">Ta réponse</span><p style="font-size:15px;line-height:1.7;color:var(--text2);margin-bottom:1rem;">${reviewRecall||'<em>Rien écrit</em>'}</p>
-      <span class="sec-lbl">Définition de référence</span><div class="def-box" style="margin-bottom:1rem;">${c.definition}</div>
-      ${c.application?`<span class="sec-lbl">Application concrète</span><div class="app-box" style="margin-bottom:1rem;">${c.application}</div>`:''}
-      ${c.image?`<img class="concept-img" src="${c.image}" style="margin-bottom:1rem;"/>`:''}
-      <span class="sec-lbl">Comment tu t'es souvenu ?</span>
+      <p style="font-size:20px;font-weight:500;margin-bottom:0.5rem;">${c.title}</p>
+      <p style="font-size:14px;color:var(--text2);margin-bottom:1.5rem;">Comment tu t'en es souvenu ?</p>
       <div class="rating-row">
         <button class="rating-btn r0" id="rate0">Pas du tout</button>
         <button class="rating-btn r1" id="rate1">Partiellement</button>
         <button class="rating-btn r2" id="rate2">Bien</button>
       </div>
-      <button class="btn-s" style="margin-top:10px;width:100%;" id="ai-q-btn">Questions IA</button></div>`;
+    </div>`;
     document.getElementById('rate0').addEventListener('click',async()=>await rate(0));
     document.getElementById('rate1').addEventListener('click',async()=>await rate(1));
     document.getElementById('rate2').addEventListener('click',async()=>await rate(2));
-    document.getElementById('ai-q-btn').addEventListener('click',()=>{reviewStep=2;renderReviewStep();});
-  }else{
-    el.innerHTML=`${prog}<div class="step-dots">${dots}</div><div class="card">
-      <p style="font-size:18px;font-weight:500;margin-bottom:1rem;">${c.title} — Questions</p>
-      <div id="q-area"><p style="color:var(--text2);font-size:14px;font-style:italic;">Génération...</p></div>
-      <button class="btn-s" style="margin-top:1rem;" id="back-btn">Retour</button></div>`;
-    document.getElementById('back-btn').addEventListener('click',()=>{reviewStep=1;renderReviewStep();});
-    genQuestions(c);
   }
 }
 async function rate(r){
@@ -631,67 +693,39 @@ async function rate(r){
   await updateConceptDB(c);await nextConcept();
 }
 async function nextConcept(){
-  reviewQueue.shift();reviewStep=0;reviewRecall='';await updateBadge();
+  reviewQueue.shift();reviewStep=0;_cardFlipped=false;await updateBadge();
   if(!reviewQueue.length){document.getElementById('review-content').innerHTML='<div class="empty" style="padding:3rem 0;"><p style="font-size:16px;font-weight:500;margin-bottom:8px;">Session terminée</p><p>Tous les concepts révisés.</p></div>';return;}
+  const data=await getConcepts();
+  const nextC=data.find(x=>x.id===reviewQueue[0]);
+  if(nextC&&getGeminiKey()&&!_preloadedQuestions[nextC.id])_preloadedQuestions[nextC.id]=genQuestionsPreload(nextC);
   await renderReviewStep();
 }
-async function genQuestions(concept){
-  const area=document.getElementById('q-area');
-  const key=getGeminiKey();
-  if(!key){if(area)area.innerHTML='<p style="color:var(--danger);font-size:14px;">Configure ta clé Gemini dans Réglages.</p>';return;}
-  try{
-    const promptText=[
-      'Tu es un assistant pédagogique. Génère 3 questions de compréhension sur ce concept.',
-      'Va au-delà de la définition : liens avec autres concepts, applications, nuances.',
-      '',
-      'Concept : '+concept.title,
-      'Définition : '+concept.definition,
-      concept.application?'Application : '+concept.application:'',
-      '',
-      'Pour chaque question, fournis une réponse de référence concise (2-3 phrases).',
-      'IMPORTANT : Dans tes réponses JSON, remplace toutes les apostrophes par des espaces.',
-      '',
-      'Réponds UNIQUEMENT en JSON valide sans markdown :',
-      '{"items":[{"question":"question 1","answer":"reponse 1"},{"question":"question 2","answer":"reponse 2"},{"question":"question 3","answer":"reponse 3"}]}'
-    ].join('\n');
-    const text=await callGemini(promptText);
-    let parsed;
-    try{
-      parsed=JSON.parse(text.replace(/```json|```/g,'').trim());
-    }catch(jsonErr){
-      // Gemini returned invalid JSON - extract questions with regex fallback
-      const qs=[];const as=[];
-      const qMatches=text.match(/"question"\s*:\s*"([^"]+)"/g)||[];
-      const aMatches=text.match(/"answer"\s*:\s*"([^"]+)"/g)||[];
-      qMatches.forEach((m,i)=>{qs.push({question:m.replace(/"question"\s*:\s*"/,'').replace(/"$/,''),answer:(aMatches[i]||'').replace(/"answer"\s*:\s*"/,'').replace(/"$/,'')});});
-      parsed={items:qs.length?qs:[{question:'Question non disponible',answer:''}]};
-    }
-    if(!area)return;
-    const items=parsed.items||[];
-    let html=items.map((item,i)=>
-      '<div style="margin-bottom:1.25rem;">'
-      +'<p style="font-size:12px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.06em;">Question '+(i+1)+'</p>'
-      +'<p style="font-size:15px;line-height:1.7;margin-bottom:8px;">'+item.question+'</p>'
-      +'<textarea class="field" style="min-height:60px;" placeholder="Ta réponse..."></textarea>'
-      +'</div>'+(i<2?'<hr/>':'')
-    ).join('');
-    html+='<button class="btn-p" style="width:100%;margin-top:1rem;" id="reveal-answers-btn">Voir les réponses de référence</button>';
-    html+='<div id="answers-reveal" style="display:none;margin-top:1rem;"></div>';
-    area.innerHTML=html;
-    window._qaItems=items;
-    document.getElementById('reveal-answers-btn').addEventListener('click',function(){
-      let ansHtml='<p style="font-size:13px;font-weight:500;color:var(--text2);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.06em;">Réponses de référence</p>';
-      (window._qaItems||[]).forEach((item,i)=>{
-        ansHtml+='<div style="margin-bottom:1rem;">'
-          +'<p style="font-size:12px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.06em;">Question '+(i+1)+'</p>'
-          +'<div class="def-box">'+item.answer+'</div>'
-          +'</div>';
-      });
-      document.getElementById('answers-reveal').innerHTML=ansHtml;
-      document.getElementById('answers-reveal').style.display='block';
-      this.style.display='none';
-    });
-  }catch(e){if(area)area.innerHTML='<p style="color:var(--danger);font-size:14px;">Erreur : '+e.message+'</p>';}
+async function genQuestionsPreload(concept){
+  const key=getGeminiKey();if(!key)return null;
+  const promptText=[
+    'Tu es un assistant pédagogique. Génère 3 questions de compréhension sur ce concept.',
+    'Va au-delà de la définition : liens avec autres concepts, applications, nuances.',
+    '',
+    'Concept : '+concept.title,
+    'Définition : '+concept.definition,
+    concept.application?'Application : '+concept.application:'',
+    '',
+    'Pour chaque question, fournis une réponse de référence concise (2-3 phrases).',
+    'IMPORTANT : Dans tes réponses JSON, remplace toutes les apostrophes par des espaces.',
+    '',
+    'Réponds UNIQUEMENT en JSON valide sans markdown :',
+    '{"items":[{"question":"question 1","answer":"reponse 1"},{"question":"question 2","answer":"reponse 2"},{"question":"question 3","answer":"reponse 3"}]}'
+  ].join('\n');
+  const text=await callGemini(promptText);
+  let parsed;
+  try{parsed=JSON.parse(text.replace(/```json|```/g,'').trim());}
+  catch(jsonErr){
+    const qMatches=text.match(/"question"\s*:\s*"([^"]+)"/g)||[];
+    const aMatches=text.match(/"answer"\s*:\s*"([^"]+)"/g)||[];
+    const qs=qMatches.map((m,i)=>({question:m.replace(/"question"\s*:\s*"/,'').replace(/"$/,''),answer:(aMatches[i]||'').replace(/"answer"\s*:\s*"/,'').replace(/"$/,'')}));
+    parsed={items:qs.length?qs:[{question:'Question non disponible',answer:''}]};
+  }
+  return parsed.items||[];
 }
 
 
@@ -700,6 +734,7 @@ async function genQuestions(concept){
   showLoading('Chargement...');
   try{await getCustomTags();await getConcepts();}finally{hideLoading();}
   await updateBadge();await renderDashboard();
+  if(getGeminiKey()){const due=(_concepts||[]).filter(isDue);if(due.length)_preloadedQuestions[due[0].id]=genQuestionsPreload(due[0]);}
 })();
 </script>
 </body>
