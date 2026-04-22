@@ -402,7 +402,7 @@ document.getElementById('overlay').addEventListener('click',function(e){if(e.tar
 document.getElementById('modal-review-btn').addEventListener('click',async function(){
   if(!currentId)return;
   const data=await getConcepts();const c=data.find(x=>x.id===currentId);
-  closeModal();reviewQueue=[currentId];reviewStep=0;_cardFlipped=false;
+  closeModal();reviewQueue=[currentId];reviewStep=getGeminiKey()?0:1;_cardFlipped=false;
   if(c&&getGeminiKey()&&!_preloadedQuestions[c.id])_preloadedQuestions[c.id]=genQuestionsPreload(c);
   await showView('review');
 });
@@ -603,7 +603,7 @@ document.getElementById('reset-import-btn').addEventListener('click',resetImport
 async function startReview(){
   const data=await getConcepts();reviewQueue=data.filter(isDue).map(c=>c.id);
   if(!reviewQueue.length){document.getElementById('review-content').innerHTML='<div class="empty" style="padding:3rem 0;"><p style="font-size:16px;font-weight:500;margin-bottom:8px;">Rien à réviser aujourd\'hui</p><p>Tous tes concepts sont à jour.</p></div>';return;}
-  reviewStep=0;_cardFlipped=false;
+  reviewStep=getGeminiKey()?0:1;_cardFlipped=false;
   const firstC=data.find(x=>x.id===reviewQueue[0]);
   if(firstC&&getGeminiKey()&&!_preloadedQuestions[firstC.id])_preloadedQuestions[firstC.id]=genQuestionsPreload(firstC);
   await renderReviewStep();
@@ -732,9 +732,15 @@ async function genQuestionsPreload(concept){
 
 (async function init(){
   showLoading('Chargement...');
-  try{await getCustomTags();await getConcepts();}finally{hideLoading();}
-  await updateBadge();await renderDashboard();
-  if(getGeminiKey()){const due=(_concepts||[]).filter(isDue);if(due.length)_preloadedQuestions[due[0].id]=genQuestionsPreload(due[0]);}
+  try{
+    await getCustomTags();await getConcepts();
+    hideLoading();
+    await updateBadge();await renderDashboard();
+    if(getGeminiKey()){const due=(_concepts||[]).filter(isDue);if(due.length)_preloadedQuestions[due[0].id]=genQuestionsPreload(due[0]);}
+  }catch(e){
+    hideLoading();
+    document.getElementById('view-dashboard').innerHTML=`<div class="card"><p style="color:var(--danger);font-size:15px;font-weight:500;margin-bottom:8px;">Impossible de charger les données.</p><p style="font-size:13px;color:var(--text2);margin-bottom:1rem;">${e.message||'Erreur réseau'}</p><button class="btn-p" onclick="location.reload()">Réessayer</button></div>`;
+  }
 })();
 </script>
 </body>
